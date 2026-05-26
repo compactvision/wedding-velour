@@ -17,26 +17,47 @@ const queryClient = new QueryClient({
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
-    resolve: (name) => {
-        const pages = import.meta.glob('./pages/**/*.tsx', { eager: true });
-        const page: any = (pages[`./pages/${name}.tsx`] as any).default;
-        
-        // Dynamic persistent layout for admin pages
-        const nonAdminPages = ['welcome', 'Invitation', 'GuestPortal', 'ServerInterface', 'DoorAgent', 'TableMenu'];
-        if (!nonAdminPages.includes(name)) {
-            page.layout = page.layout || ((p: any) => <AppLayout children={p} />);
+
+    resolve: async (name) => {
+        const pages = import.meta.glob('./pages/**/*.tsx');
+
+        const resolvePage = pages[`./pages/${name}.tsx`];
+
+        if (!resolvePage) {
+            throw new Error(`Page not found: ${name}`);
         }
-        
-        return page;
+
+        const page: any = await resolvePage();
+        const component = page.default;
+
+        const nonAdminPages = [
+            'welcome',
+            'Invitation',
+            'GuestPortal',
+            'ServerInterface',
+            'DoorAgent',
+            'TableMenu',
+        ];
+
+        if (!nonAdminPages.includes(name)) {
+            component.layout =
+                component.layout ||
+                ((p: any) => <AppLayout children={p} />);
+        }
+
+        return component;
     },
+
     setup({ el, App, props }) {
         const root = createRoot(el);
+
         root.render(
             <QueryClientProvider client={queryClient}>
                 <App {...props} />
             </QueryClientProvider>
         );
     },
+
     progress: {
         color: '#4B5563',
     },
