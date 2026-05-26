@@ -1,21 +1,50 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
-Route::inertia('/', 'Dashboard')->name('dashboard');
-Route::inertia('/guests', 'Guests')->name('guests');
-Route::inertia('/tables', 'Tables')->name('tables');
-Route::inertia('/menu-admin', 'MenuAdmin')->name('menu-admin');
-Route::inertia('/orders', 'Orders')->name('orders');
-Route::inertia('/timeline', 'Timeline')->name('timeline');
-Route::inertia('/photos', 'Photos')->name('photos');
-Route::inertia('/notifications', 'Notifications')->name('notifications');
-Route::inertia('/manager', 'ManagerDashboard')->name('manager');
-Route::inertia('/server', 'ServerInterface')->name('server');
-Route::inertia('/door', 'DoorAgent')->name('door');
-Route::inertia('/invitation', 'Invitation')->name('invitation');
-Route::inertia('/guest-portal', 'GuestPortal')->name('guest-portal');
-Route::inertia('/table-menu', 'TableMenu')->name('table-menu');
+Route::get('/', function() {
+    return Inertia::render('Dashboard');
+})->name('dashboard');
+Route::get('/guests', function() {
+    return Inertia::render('Guests');
+})->name('guests');
+Route::get('/tables', function() {
+    return Inertia::render('Tables');
+})->name('tables');
+Route::get('/menu-admin', function() {
+    return Inertia::render('MenuAdmin');
+})->name('menu-admin');
+Route::get('/orders', function() {
+    return Inertia::render('Orders');
+})->name('orders');
+Route::get('/timeline', function() {
+    return Inertia::render('Timeline');
+})->name('timeline');
+Route::get('/photos', function() {
+    return Inertia::render('Photos');
+})->name('photos');
+Route::get('/notifications', function() {
+    return Inertia::render('Notifications');
+})->name('notifications');
+Route::get('/manager', function() {
+    return Inertia::render('ManagerDashboard');
+})->name('manager');
+Route::get('/server', function() {
+    return Inertia::render('ServerInterface');
+})->name('server');
+Route::get('/door', function() {
+    return Inertia::render('DoorAgent');
+})->name('door');
+Route::get('/invitation', function() {
+    return Inertia::render('Invitation');
+})->name('invitation');
+Route::get('/guest-portal', function() {
+    return Inertia::render('GuestPortal');
+})->name('guest-portal');
+Route::get('/table-menu', function() {
+    return Inertia::render('TableMenu');
+})->name('table-menu');
 
 // Auth
 Route::post('/logout', function () {
