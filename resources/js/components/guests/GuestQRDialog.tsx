@@ -30,7 +30,20 @@ export default function GuestQRDialog({ open, onOpenChange, guest, wedding }) {
   );
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(inviteUrl);
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(inviteUrl).catch(() => {});
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = inviteUrl;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      textArea.style.top = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try { document.execCommand('copy'); } catch (err) {}
+      textArea.remove();
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

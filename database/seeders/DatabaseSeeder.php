@@ -313,7 +313,7 @@ class DatabaseSeeder extends Seeder
                 'dietary_restrictions' => 'Pas de porc',
                 'drink_preference' => 'Bière Primus',
                 'qr_code' => 'QR_DIEUDONNE_KABANGE',
-                'invitation_link' => 'http://localhost:8000/invitation?invite=4bd02128-52b9-4609-9f9e-8e9bc3ab6914',
+                'invitation_link' => '4bd02128-52b9-4609-9f9e-8e9bc3ab6914',
                 'rsvp_message' => 'Hâte de célébrer ce grand jour avec vous ! Vive la Rumba !',
                 'table_id' => 'caa86ae6-a175-4644-8c8d-a8d457687119',
             ],

@@ -30,12 +30,15 @@ export default function Guests() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Guest.create({
-      ...data,
-      wedding_id: activeWeddingId,
-      qr_code: crypto.randomUUID(),
-      invitation_link: crypto.randomUUID()
-    }),
+    mutationFn: (data) => {
+      const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+      return base44.entities.Guest.create({
+        ...data,
+        wedding_id: activeWeddingId,
+        qr_code: generateId(),
+        invitation_link: generateId()
+      });
+    },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['guests', activeWeddingId] }); setShowForm(false); }
   });
 
