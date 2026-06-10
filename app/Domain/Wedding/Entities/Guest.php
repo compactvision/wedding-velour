@@ -19,6 +19,7 @@ class Guest
         public ?string $invitationLink = null,
         public ?string $rsvpMessage = null,
         public ?string $tableId = null,
-        public ?string $drinkPreference = null
+        public ?string $drinkPreference = null,
+        public ?array $menuPreferences = null
     ) {}
 }

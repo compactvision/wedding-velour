@@ -13,4 +13,8 @@ class GuestModel extends Model
     protected $guarded = [];
     public $incrementing = false;
     protected $keyType = 'string';
+
+    protected $casts = [
+        'menu_preferences' => 'array',
+    ];
 }

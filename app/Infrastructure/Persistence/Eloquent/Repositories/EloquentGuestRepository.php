@@ -33,6 +33,7 @@ class EloquentGuestRepository implements GuestRepositoryInterface
                 'rsvp_message'         => $guest->rsvpMessage,
                 'table_id'             => $guest->tableId,
                 'drink_preference'     => $guest->drinkPreference,
+                'menu_preferences'     => $guest->menuPreferences,
             ]
         );
     }
@@ -69,6 +70,7 @@ class EloquentGuestRepository implements GuestRepositoryInterface
             rsvpMessage: $m->rsvp_message,
             tableId: $m->table_id,
             drinkPreference: $m->drink_preference,
+            menuPreferences: $m->menu_preferences,
         );
     }
 }

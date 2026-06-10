@@ -1,26 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Heart, MapPin, CalendarDays, Clock, GlassWater, Utensils, CheckCircle2, XCircle, Users, MailOpen } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Heart, MapPin, CalendarDays, Clock, GlassWater, Utensils, CheckCircle2, XCircle, Users, MailOpen, ChefHat, Check, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { usePage } from '@inertiajs/react';
 
-const DRINK_OPTIONS = [
-  { value: 'champagne', label: 'Champagne' },
-  { value: 'wine_red', label: 'Vin Rouge' },
-  { value: 'wine_white', label: 'Vin Blanc' },
-  { value: 'cocktail', label: 'Cocktail' },
-  { value: 'beer', label: 'Bière' },
-  { value: 'soft', label: 'Soft / Sans alcool' },
-  { value: 'water', label: 'Eau gazeuse' },
-];
+const CATEGORY_LABELS: Record<string, { label: string; emoji: string }> = {
+  starter:  { label: 'Entrées',         emoji: '🥗' },
+  main:     { label: 'Plats Principaux', emoji: '🍽️' },
+  dessert:  { label: 'Desserts',         emoji: '🍰' },
+  drink:    { label: 'Boissons',         emoji: '🥂' },
+};
+
+const MAX_PREFERENCES = 5;
 
 export default function Invitation() {
   const { url } = usePage();
@@ -39,7 +37,9 @@ export default function Invitation() {
   const [showLetter, setShowLetter] = useState(false);
   
   // Form states
-  const [drinkPreference, setDrinkPreference] = useState('');
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [menuPreferences, setMenuPreferences] = useState<string[]>([]);
+  const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -52,13 +52,14 @@ export default function Invitation() {
       if (guests.length > 0) {
         const currentGuest = guests[0];
         setGuest(currentGuest);
-        setDrinkPreference(currentGuest.drink_preference || '');
+        setMenuPreferences(currentGuest.menu_preferences || []);
 
-        const [allWeddings, allTimeline, allTables, tableGuests] = await Promise.all([
+        const [allWeddings, allTimeline, allTables, tableGuests, weddingMenuItems] = await Promise.all([
           base44.entities.Wedding.list(),
           base44.entities.TimelineEvent.filter({ wedding_id: currentGuest.wedding_id }),
           currentGuest.table_id ? base44.entities.WeddingTable.filter({ id: currentGuest.table_id }) : Promise.resolve([]),
           currentGuest.table_id ? base44.entities.Guest.filter({ table_id: currentGuest.table_id }) : Promise.resolve([]),
+          base44.entities.MenuItem.filter({ wedding_id: currentGuest.wedding_id }),
         ]);
 
         const w = allWeddings.find(w => w.id === currentGuest.wedding_id);
@@ -66,6 +67,7 @@ export default function Invitation() {
 
         // Sort timeline
         setTimeline(allTimeline.sort((a, b) => a.time.localeCompare(b.time)));
+        setMenuItems(weddingMenuItems.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
         
         if (allTables.length > 0) setTable(allTables[0]);
         setCoGuests(tableGuests.filter(g => g.id !== currentGuest.id));
@@ -86,9 +88,9 @@ export default function Invitation() {
       await base44.entities.Guest.update(guest.id, {
         ...guest,
         status,
-        drink_preference: drinkPreference,
+        menu_preferences: menuPreferences,
       });
-      setGuest({ ...guest, status, drink_preference: drinkPreference });
+      setGuest({ ...guest, status, menu_preferences: menuPreferences });
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
     } catch (e) {
@@ -120,6 +122,18 @@ export default function Invitation() {
 
   const isAttending = guest.status === 'attending';
   const isDeclined = guest.status === 'declined';
+
+  const toggleMenuPreference = (itemId: string) => {
+    setMenuPreferences(prev => {
+      if (prev.includes(itemId)) {
+        return prev.filter(id => id !== itemId);
+      }
+      if (prev.length >= 5) {
+        return prev;
+      }
+      return [...prev, itemId];
+    });
+  };
 
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col items-center overflow-x-hidden font-sans selection:bg-primary/20">
@@ -311,18 +325,173 @@ export default function Invitation() {
 
                 <div className="space-y-6">
                   <div className="space-y-3">
-                    <Label className="text-stone-700">Votre boisson de prédilection ?</Label>
-                    <p className="text-xs text-stone-500">Cela nous aidera à ajuster les quantités pour le bar.</p>
-                    <Select value={drinkPreference} onValueChange={setDrinkPreference}>
-                      <SelectTrigger className="w-full h-12 bg-stone-50 rounded-xl border-stone-200 focus:ring-primary/30">
-                        <SelectValue placeholder="Sélectionnez une boisson" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DRINK_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-stone-700">Vos préférences culinaires</Label>
+                    <p className="text-xs text-stone-500">Aidez-nous à composer le menu parfait en choisissant vos plats favoris (jusqu'à 5).</p>
+                    
+                    <Dialog open={isMenuModalOpen} onOpenChange={setIsMenuModalOpen}>
+                      <DialogTrigger asChild>
+                        <button className={cn(
+                          "w-full h-14 flex items-center gap-3 px-4 rounded-xl border-2 transition-all duration-300 group text-left",
+                          menuPreferences.length > 0
+                            ? "border-primary/40 bg-primary/5 hover:bg-primary/10"
+                            : "border-stone-200 bg-stone-50 hover:border-stone-300 hover:bg-stone-100"
+                        )}>
+                          <ChefHat className={cn("w-5 h-5 shrink-0 transition-colors", menuPreferences.length > 0 ? "text-primary" : "text-stone-400 group-hover:text-stone-600")} />
+                          <div className="flex-1 min-w-0">
+                            {menuPreferences.length > 0 ? (
+                              <span className="font-semibold text-primary text-sm">
+                                {menuPreferences.length} plat{menuPreferences.length > 1 ? 's' : ''} sélectionné{menuPreferences.length > 1 ? 's' : ''} — Modifier
+                              </span>
+                            ) : (
+                              <span className="text-stone-500 text-sm">Découvrir le menu et choisir mes préférences</span>
+                            )}
+                          </div>
+                          {menuPreferences.length > 0 && (
+                            <span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-primary text-white">{menuPreferences.length}/{MAX_PREFERENCES}</span>
+                          )}
+                        </button>
+                      </DialogTrigger>
+
+                      <DialogContent className="max-w-2xl bg-stone-50 border-0 shadow-2xl p-0 overflow-hidden rounded-[2rem] max-h-[90vh] flex flex-col">
+                        {/* Header */}
+                        <div className="p-7 md:p-9 border-b border-stone-100 bg-white relative shrink-0">
+                          <div className="absolute top-0 right-0 w-36 h-36 bg-primary/5 rounded-bl-full pointer-events-none" />
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                              <ChefHat className="w-6 h-6 text-primary" />
+                            </div>
+                            <div>
+                              <DialogTitle className="font-display text-2xl text-stone-800">Notre Carte du Menu</DialogTitle>
+                              <DialogDescription className="text-stone-500 mt-1">
+                                Choisissez vos favoris parmi nos propositions
+                              </DialogDescription>
+                            </div>
+                          </div>
+                          {/* Progress bar */}
+                          <div className="mt-5">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs text-stone-500 font-medium">Mes sélections</span>
+                              <span className={cn("text-xs font-bold", menuPreferences.length >= MAX_PREFERENCES ? "text-primary" : "text-stone-600")}>
+                                {menuPreferences.length} / {MAX_PREFERENCES}
+                              </span>
+                            </div>
+                            <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+                              <motion.div
+                                className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary"
+                                animate={{ width: `${(menuPreferences.length / MAX_PREFERENCES) * 100}%` }}
+                                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                              />
+                            </div>
+                            {menuPreferences.length >= MAX_PREFERENCES && (
+                              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-1.5 mt-2 text-xs text-primary font-medium">
+                                <Sparkles className="w-3 h-3" />
+                                Maximum atteint ! Vous pouvez déselectionner pour modifier.
+                              </motion.p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Scrollable content grouped by category */}
+                        <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+                          {menuItems.length === 0 ? (
+                            <div className="text-center py-12">
+                              <Utensils className="w-10 h-10 text-stone-300 mx-auto mb-3" />
+                              <p className="text-stone-500">Le menu n'est pas encore disponible.</p>
+                            </div>
+                          ) : (
+                            Object.entries(
+                              menuItems.reduce((acc: Record<string, any[]>, item) => {
+                                const cat = item.category || 'other';
+                                if (!acc[cat]) acc[cat] = [];
+                                acc[cat].push(item);
+                                return acc;
+                              }, {})
+                            ).map(([category, items]) => {
+                              const catMeta = CATEGORY_LABELS[category] || { label: category, emoji: '🍴' };
+                              return (
+                                <div key={category}>
+                                  <div className="flex items-center gap-2 mb-4">
+                                    <span className="text-lg">{catMeta.emoji}</span>
+                                    <h4 className="font-display text-lg text-stone-700">{catMeta.label}</h4>
+                                    <div className="flex-1 h-px bg-stone-200" />
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {(items as any[]).map(item => {
+                                      const isSelected = menuPreferences.includes(item.id);
+                                      const isDisabled = !isSelected && menuPreferences.length >= MAX_PREFERENCES;
+                                      return (
+                                        <motion.button
+                                          key={item.id}
+                                          type="button"
+                                          whileHover={!isDisabled ? { scale: 1.02 } : {}}
+                                          whileTap={!isDisabled ? { scale: 0.97 } : {}}
+                                          onClick={() => (!isDisabled || isSelected) ? toggleMenuPreference(item.id) : undefined}
+                                          className={cn(
+                                            "relative w-full p-4 rounded-2xl border-2 transition-all duration-200 text-left flex items-start gap-3 group",
+                                            isSelected
+                                              ? "border-primary bg-primary/5 shadow-md shadow-primary/10"
+                                              : isDisabled
+                                                ? "border-stone-100 bg-stone-100/60 opacity-50 cursor-not-allowed"
+                                                : "border-transparent bg-white hover:border-stone-200 hover:shadow-sm"
+                                          )}
+                                        >
+                                          <div className={cn(
+                                            "w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 transition-all",
+                                            isSelected ? "bg-primary/15 scale-110" : "bg-stone-50 group-hover:bg-stone-100"
+                                          )}>
+                                            {item.emoji || '🍽️'}
+                                          </div>
+                                          <div className="flex-1 min-w-0 pr-6">
+                                            <p className={cn("font-semibold text-sm leading-tight", isSelected ? "text-primary" : "text-stone-800")}>
+                                              {item.name}
+                                            </p>
+                                            {item.description && (
+                                              <p className="text-xs text-stone-400 mt-1 line-clamp-2 leading-relaxed">{item.description}</p>
+                                            )}
+                                          </div>
+                                          {/* Checkmark */}
+                                          <div className={cn(
+                                            "absolute top-3 right-3 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200",
+                                            isSelected
+                                              ? "bg-primary border-primary shadow-sm scale-100"
+                                              : "border-stone-200 scale-75 opacity-0 group-hover:scale-100 group-hover:opacity-60"
+                                          )}>
+                                            <Check className="w-3 h-3 text-white" />
+                                          </div>
+                                        </motion.button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="shrink-0 p-6 md:p-8 bg-white border-t border-stone-100 flex flex-col sm:flex-row items-center gap-4">
+                          {menuPreferences.length > 0 && (
+                            <div className="flex-1 flex flex-wrap gap-1.5">
+                              {menuPreferences.map(id => {
+                                const item = menuItems.find(m => m.id === id);
+                                return item ? (
+                                  <span key={id} className="text-xs bg-primary/10 text-primary font-medium px-2.5 py-1 rounded-full flex items-center gap-1">
+                                    {item.emoji} {item.name}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                          )}
+                          <Button
+                            onClick={() => setIsMenuModalOpen(false)}
+                            className="shrink-0 w-full sm:w-auto rounded-xl px-8 h-12 bg-stone-900 hover:bg-stone-800 gap-2"
+                          >
+                            <Check className="w-4 h-4" />
+                            Confirmer mes choix
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
 
                   {savedSuccess && (
