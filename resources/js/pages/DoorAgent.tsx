@@ -11,6 +11,7 @@ import { Search, CheckCircle2, XCircle, UserCheck, Users, AlertCircle, Map as Ma
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from '@inertiajs/react';
+import OfflineStatus from '@/components/shared/OfflineStatus';
 
 function TableMap({ tables, highlightedTableId, weddingId }) {
   if (!tables || tables.length === 0) return null;
@@ -190,8 +191,15 @@ export default function DoorAgent() {
   });
 
   const markPresent = useMutation({
-    mutationFn: (guestId) => base44.entities.Guest.update(guestId, { status: 'confirmed' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['guests', activeWeddingId] }),
+    mutationFn: (guestId: string) => base44.entities.Guest.update(guestId, { status: 'confirmed' }),
+    onSuccess: (_updated, guestId) => {
+      queryClient.setQueryData(['guests', activeWeddingId], (current: any[] = []) =>
+        current.map(guest => guest.id === guestId ? { ...guest, status: 'confirmed' } : guest),
+      );
+      if (navigator.onLine) {
+        void queryClient.invalidateQueries({ queryKey: ['guests', activeWeddingId] });
+      }
+    },
   });
 
   const confirmed = guests.filter(g => g.status === 'confirmed');
@@ -244,6 +252,7 @@ export default function DoorAgent() {
             <p className="text-xs text-stone-500">Agent d'accueil</p>
           </div>
           <div className="flex items-center gap-2">
+            <OfflineStatus compact />
             <Button variant="outline" size="sm" onClick={() => setShowFullMap(!showFullMap)}>
               <MapIcon className="w-4 h-4 mr-2 text-primary" />
               Plan de salle

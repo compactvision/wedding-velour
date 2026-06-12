@@ -19,6 +19,7 @@ use App\Domain\Wedding\Repositories\WeddingNotificationRepositoryInterface;
 use App\Domain\Wedding\Repositories\WeddingRepositoryInterface;
 use App\Domain\Wedding\Repositories\WeddingTableRepositoryInterface;
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Persistence\Eloquent\WeddingNotificationModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use ReflectionClass;
@@ -145,6 +146,25 @@ class EntityController extends Controller
 
         $entity = $this->deserializeEntity($entityClass, $data);
         $repo->save($entity);
+
+        if (
+            strtolower($entityName) === 'guest'
+            && ($existingData['status'] ?? null) !== 'confirmed'
+            && ($updatedData['status'] ?? null) === 'confirmed'
+        ) {
+            WeddingNotificationModel::firstOrCreate(
+                ['source_key' => "guest-confirmed:{$id}"],
+                [
+                    'id' => (string) Str::uuid(),
+                    'wedding_id' => $updatedData['wedding_id'],
+                    'title' => 'Invité arrivé',
+                    'message' => trim(($updatedData['first_name'] ?? '').' '.($updatedData['last_name'] ?? '')).' vient d’être enregistré à l’entrée.',
+                    'type' => 'info',
+                    'target_role' => 'manager',
+                    'is_read' => false,
+                ],
+            );
+        }
 
         $saved = $repo->find($id);
 

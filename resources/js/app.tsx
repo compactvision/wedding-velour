@@ -5,6 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+        void navigator.serviceWorker.register('/sw.js');
+    });
+}
+
 // Instantiate the QueryClient
 const queryClient = new QueryClient({
     defaultOptions: {

@@ -8,6 +8,7 @@ use App\Infrastructure\Persistence\Eloquent\MenuItemModel;
 use App\Infrastructure\Persistence\Eloquent\OrderModel;
 use App\Infrastructure\Persistence\Eloquent\TimelineEventModel;
 use App\Infrastructure\Persistence\Eloquent\WeddingModel;
+use App\Infrastructure\Persistence\Eloquent\WeddingNotificationModel;
 use App\Infrastructure\Persistence\Eloquent\WeddingTableModel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -54,23 +55,20 @@ class PublicWeddingController extends Controller
             'type' => ['required', 'in:drink,food,dessert,special_request'],
             'description' => ['required', 'string', 'max:500'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'offline_uuid' => ['nullable', 'uuid'],
         ]);
 
-        $order = OrderModel::create([
-            'id' => (string) Str::uuid(),
-            'wedding_id' => $guest->wedding_id,
-            'table_id' => $guest->table_id,
-            'table_name' => $guest->table_id
-                ? WeddingTableModel::find($guest->table_id)?->name
-                : 'Non assigné',
-            'guest_id' => $guest->id,
-            'guest_name' => "{$guest->first_name} {$guest->last_name}",
-            ...$data,
-            'status' => 'pending',
-            'priority' => 'normal',
-        ]);
+        $offlineUuid = $data['offline_uuid'] ?? null;
+        $order = $offlineUuid
+            ? OrderModel::firstOrCreate(
+                ['offline_uuid' => $offlineUuid],
+                $this->invitationOrderAttributes($guest, $data)
+            )
+            : OrderModel::create($this->invitationOrderAttributes($guest, $data));
 
-        return response()->json($order, 201);
+        $this->notifyNewOrder($order);
+
+        return response()->json($order, $order->wasRecentlyCreated ? 201 : 200);
     }
 
     public function tableMenu(string $tableId): JsonResponse
@@ -95,9 +93,11 @@ class PublicWeddingController extends Controller
             'type' => ['required', 'in:drink,food,dessert,special_request'],
             'description' => ['required', 'string', 'max:500'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'offline_uuid' => ['nullable', 'uuid'],
         ]);
 
-        $order = OrderModel::create([
+        $offlineUuid = $data['offline_uuid'] ?? null;
+        $attributes = [
             'id' => (string) Str::uuid(),
             'wedding_id' => $table->wedding_id,
             'table_id' => $table->id,
@@ -105,8 +105,46 @@ class PublicWeddingController extends Controller
             ...$data,
             'status' => 'pending',
             'priority' => 'normal',
-        ]);
+        ];
+        $order = $offlineUuid
+            ? OrderModel::firstOrCreate(['offline_uuid' => $offlineUuid], $attributes)
+            : OrderModel::create($attributes);
 
-        return response()->json($order, 201);
+        $this->notifyNewOrder($order);
+
+        return response()->json($order, $order->wasRecentlyCreated ? 201 : 200);
+    }
+
+    private function invitationOrderAttributes(GuestModel $guest, array $data): array
+    {
+        return [
+            'id' => (string) Str::uuid(),
+            'wedding_id' => $guest->wedding_id,
+            'table_id' => $guest->table_id,
+            'table_name' => $guest->table_id
+                ? WeddingTableModel::find($guest->table_id)?->name
+                : 'Non assigné',
+            'guest_id' => $guest->id,
+            'guest_name' => "{$guest->first_name} {$guest->last_name}",
+            ...$data,
+            'status' => 'pending',
+            'priority' => 'normal',
+        ];
+    }
+
+    private function notifyNewOrder(OrderModel $order): void
+    {
+        WeddingNotificationModel::firstOrCreate(
+            ['source_key' => "order:{$order->id}"],
+            [
+                'id' => (string) Str::uuid(),
+                'wedding_id' => $order->wedding_id,
+                'title' => 'Nouvelle commande',
+                'message' => "{$order->guest_name} · {$order->table_name} · {$order->description}",
+                'type' => 'order',
+                'target_role' => 'server',
+                'is_read' => false,
+            ],
+        );
     }
 }

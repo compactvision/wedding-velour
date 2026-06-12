@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { cachedGet, createOfflineId, queuedMutation } from '@/lib/offline';
 
 class EntityClient<T = any> {
   private endpoint: string;
@@ -8,19 +9,16 @@ class EntityClient<T = any> {
   }
 
   async list(): Promise<T[]> {
-    const res = await axios.get(this.endpoint);
-    return res.data;
+    return cachedGet<T[]>(this.endpoint);
   }
 
   async filter(criteria: Record<string, any> = {}, orderBy?: string): Promise<T[]> {
     const params = { ...criteria, orderBy };
-    const res = await axios.get(this.endpoint, { params });
-    return res.data;
+    return cachedGet<T[]>(this.endpoint, { params });
   }
 
   async get(id: string): Promise<T> {
-    const res = await axios.get(`${this.endpoint}/${id}`);
-    return res.data;
+    return cachedGet<T>(`${this.endpoint}/${id}`);
   }
 
   async create(data: Partial<T>): Promise<T> {
@@ -29,8 +27,13 @@ class EntityClient<T = any> {
   }
 
   async update(id: string, data: Partial<T>): Promise<T> {
-    const res = await axios.put(`${this.endpoint}/${id}`, data);
-    return res.data;
+    return queuedMutation<T>(
+      'put',
+      `${this.endpoint}/${id}`,
+      data as Record<string, unknown>,
+      `Mise à jour ${this.endpoint.split('/').pop()}`,
+      { id, ...data, _offline_pending: true } as T,
+    );
   }
 
   async delete(id: string): Promise<void> {
@@ -75,20 +78,54 @@ export const base44 = {
     },
   },
   public: {
-    async invitation(token: string) {
-      return (await axios.get(`/api/public/invitations/${encodeURIComponent(token)}`)).data;
+    async invitation(token: string): Promise<any> {
+      return cachedGet<any>(`/api/public/invitations/${encodeURIComponent(token)}`);
     },
     async respondToInvitation(token: string, data: Record<string, any>) {
-      return (await axios.put(`/api/public/invitations/${encodeURIComponent(token)}`, data)).data;
+      return queuedMutation(
+        'put',
+        `/api/public/invitations/${encodeURIComponent(token)}`,
+        data,
+        'Réponse à l’invitation',
+        { ...data, _offline_pending: true },
+      );
     },
     async createInvitationOrder(token: string, data: Record<string, any>) {
-      return (await axios.post(`/api/public/invitations/${encodeURIComponent(token)}/orders`, data)).data;
+      const offlineUuid = data.offline_uuid || createOfflineId();
+      return queuedMutation(
+        'post',
+        `/api/public/invitations/${encodeURIComponent(token)}/orders`,
+        { ...data, offline_uuid: offlineUuid },
+        'Commande invité',
+        {
+          id: offlineUuid,
+          ...data,
+          offline_uuid: offlineUuid,
+          status: 'pending_sync',
+          created_date: new Date().toISOString(),
+          _offline_pending: true,
+        },
+      );
     },
-    async tableMenu(tableId: string) {
-      return (await axios.get(`/api/public/table-menus/${tableId}`)).data;
+    async tableMenu(tableId: string): Promise<any> {
+      return cachedGet<any>(`/api/public/table-menus/${tableId}`);
     },
     async createTableOrder(tableId: string, data: Record<string, any>) {
-      return (await axios.post(`/api/public/table-menus/${tableId}/orders`, data)).data;
+      const offlineUuid = data.offline_uuid || createOfflineId();
+      return queuedMutation(
+        'post',
+        `/api/public/table-menus/${tableId}/orders`,
+        { ...data, offline_uuid: offlineUuid },
+        'Commande à table',
+        {
+          id: offlineUuid,
+          ...data,
+          offline_uuid: offlineUuid,
+          status: 'pending_sync',
+          created_date: new Date().toISOString(),
+          _offline_pending: true,
+        },
+      );
     },
   },
 };

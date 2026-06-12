@@ -13,6 +13,7 @@ import { Heart, CheckCircle2, XCircle, UtensilsCrossed, Send, MapPin, CalendarDa
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import OfflineStatus from '@/components/shared/OfflineStatus';
 
 export default function GuestPortal() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -92,6 +93,9 @@ export default function GuestPortal() {
     <div className="min-h-screen bg-background font-sans">
       {/* Hero */}
       <div className="relative bg-gradient-to-b from-primary/10 to-background px-4 pt-12 pb-8 text-center">
+        <div className="absolute right-4 top-4">
+          <OfflineStatus />
+        </div>
         <Heart className="w-10 h-10 mx-auto text-primary mb-3" fill="currentColor" />
         <h1 className="font-display text-3xl md:text-4xl font-semibold text-foreground">{wedding?.title || 'Mariage'}</h1>
         {wedding?.date && (

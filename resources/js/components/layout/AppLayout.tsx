@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { cn } from '@/lib/utils';
+import OfflineStatus from '@/components/shared/OfflineStatus';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -13,6 +14,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         collapsed ? "ml-16" : "ml-64"
       )}>
         <div className="p-6 lg:p-8 max-w-[1600px] mx-auto">
+          <div className="mb-4 flex justify-end">
+            <OfflineStatus />
+          </div>
           {children}
         </div>
       </main>

@@ -16,6 +16,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Link } from '@inertiajs/react';
 import { useOrderNotificationSound } from '@/hooks/useOrderNotificationSound';
+import OfflineStatus from '@/components/shared/OfflineStatus';
 
 const typeEmojis = { drink: '🍷', food: '🍽️', dessert: '🍰', special_request: '✨' };
 const priorityBorders = { low: 'border-l-gray-300', normal: 'border-l-blue-400', high: 'border-l-amber-400', urgent: 'border-l-red-500' };
@@ -43,7 +44,14 @@ export default function ServerInterface() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, status }) => base44.entities.Order.update(id, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['orders', activeWeddingId] }),
+    onSuccess: (updated: any, variables: any) => {
+      queryClient.setQueryData(['orders', activeWeddingId], (current: any[] = []) =>
+        current.map(order => order.id === variables.id ? { ...order, ...updated, status: variables.status } : order),
+      );
+      if (navigator.onLine) {
+        void queryClient.invalidateQueries({ queryKey: ['orders', activeWeddingId] });
+      }
+    },
   });
 
   const filtered = tab === 'all' ? orders : orders.filter(o => o.status === tab);
@@ -68,6 +76,7 @@ export default function ServerInterface() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <OfflineStatus compact />
             <Button variant="outline" size="sm" onClick={toggleSound} title="Activer ou couper le son">
               {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               <span className="ml-2 hidden sm:inline">Son</span>

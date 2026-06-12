@@ -9,6 +9,8 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import { Heart, Wine, UtensilsCrossed, IceCream, Sparkles, Send, CheckCircle2, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import OfflineStatus from '@/components/shared/OfflineStatus';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 const CATEGORY_MAP = {
   drink: { label: 'Boissons', icon: <Wine className="w-5 h-5" /> },
@@ -34,6 +36,7 @@ export default function TableMenu() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [recentOrders, setRecentOrders] = useState([]);
+  const { online } = useOfflineSync();
 
   useEffect(() => {
     async function load() {
@@ -95,6 +98,9 @@ export default function TableMenu() {
     <div className="min-h-screen bg-gradient-to-b from-primary/8 via-background to-background font-sans">
       {/* Header */}
       <div className="bg-gradient-to-b from-primary/15 to-transparent px-4 pt-10 pb-6 text-center">
+        <div className="mx-auto mb-4 flex max-w-md justify-end">
+          <OfflineStatus />
+        </div>
         <div className="flex items-center justify-center gap-3 mb-3">
           <div className="h-px w-10 bg-primary/40" />
           <Heart className="w-5 h-5 text-primary" fill="currentColor" />
@@ -197,7 +203,9 @@ export default function TableMenu() {
                 <motion.div key="sent" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
                   className="flex items-center justify-center gap-2 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700">
                   <CheckCircle2 className="w-5 h-5" />
-                  <span className="font-medium">Commande envoyée !</span>
+                  <span className="font-medium">
+                    {online ? 'Commande envoyée !' : 'Commande enregistrée, en attente de connexion'}
+                  </span>
                 </motion.div>
               ) : (
                 <motion.div key="btn" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>

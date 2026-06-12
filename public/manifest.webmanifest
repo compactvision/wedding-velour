@@ -1,0 +1,16 @@
+{
+  "name": "Wedding Velour",
+  "short_name": "Velour",
+  "description": "Gestion du mariage, commandes et accueil utilisables hors ligne.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fffaf5",
+  "theme_color": "#8b1e1e",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
