@@ -37,6 +37,7 @@ createInertiaApp({
             'ServerInterface',
             'DoorAgent',
             'TableMenu',
+            'auth/Login',
         ];
 
         if (!nonAdminPages.includes(name)) {

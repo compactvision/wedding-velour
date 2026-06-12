@@ -38,17 +38,14 @@ export default function TableMenu() {
   useEffect(() => {
     async function load() {
       if (!tableId) { setLoading(false); return; }
-      const tables = await base44.entities.WeddingTable.filter({ id: tableId });
-      if (tables.length > 0) {
-        const t = tables[0];
-        setTable(t);
-        const [allWeddings, items] = await Promise.all([
-          base44.entities.Wedding.list(),
-          base44.entities.MenuItem.filter({ wedding_id: t.wedding_id }),
-        ]);
-        const found = allWeddings.find(w => w.id === t.wedding_id);
-        if (found) setWedding(found);
-        setMenuItems(items.filter(i => i.is_available !== false));
+      try {
+        const data = await base44.public.tableMenu(tableId);
+        setTable(data.table);
+        setWedding(data.wedding);
+        setMenuItems(data.menu_items || []);
+        if (data.menu_items?.length) setSelectedTab(data.menu_items[0].category);
+      } catch {
+        setTable(null);
       }
       setLoading(false);
     }
@@ -59,10 +56,7 @@ export default function TableMenu() {
     if (!selected && !notes.trim()) return;
     setSending(true);
     const item = menuItems.find(i => i.id === selected);
-    const order = await base44.entities.Order.create({
-      wedding_id: table.wedding_id,
-      table_id: table.id,
-      table_name: table.name,
+    const order = await base44.public.createTableOrder(table.id, {
       guest_name: guestName.trim(),
       type: item ? item.category : 'special_request',
       description: item ? `${item.emoji || ''} ${item.name}` : notes,

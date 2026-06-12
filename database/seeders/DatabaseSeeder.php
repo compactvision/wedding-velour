@@ -2,15 +2,15 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use App\Infrastructure\Persistence\Eloquent\WeddingModel;
-use App\Infrastructure\Persistence\Eloquent\WeddingTableModel;
 use App\Infrastructure\Persistence\Eloquent\GuestModel;
 use App\Infrastructure\Persistence\Eloquent\MenuItemModel;
 use App\Infrastructure\Persistence\Eloquent\OrderModel;
-use App\Infrastructure\Persistence\Eloquent\TimelineEventModel;
 use App\Infrastructure\Persistence\Eloquent\PhotoModel;
+use App\Infrastructure\Persistence\Eloquent\TimelineEventModel;
+use App\Infrastructure\Persistence\Eloquent\WeddingModel;
 use App\Infrastructure\Persistence\Eloquent\WeddingNotificationModel;
+use App\Infrastructure\Persistence\Eloquent\WeddingTableModel;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -40,6 +40,8 @@ class DatabaseSeeder extends Seeder
             'name' => 'Elikia Mutombo',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
+            'role' => 'admin',
+            'is_active' => true,
         ]);
 
         // 2. Create Wedding
@@ -123,7 +125,7 @@ class DatabaseSeeder extends Seeder
                 'shape' => 'round',
                 'assigned_server' => 'Marc',
                 'category' => 'other',
-            ]
+            ],
         ];
 
         foreach ($tablesData as $t) {
@@ -290,7 +292,7 @@ class DatabaseSeeder extends Seeder
                 'remaining_quantity' => 400,
                 'is_available' => true,
                 'sort_order' => 13,
-            ]
+            ],
         ];
 
         foreach ($menuItems as $item) {
@@ -477,7 +479,7 @@ class DatabaseSeeder extends Seeder
                 'invitation_link' => null,
                 'rsvp_message' => 'Malheureusement hors du pays à cette date. Toutes mes félicitations !',
                 'table_id' => null,
-            ]
+            ],
         ];
 
         foreach ($guestsData as $g) {
@@ -555,7 +557,7 @@ class DatabaseSeeder extends Seeder
                 'category' => 'party',
                 'status' => 'upcoming',
                 'notify_all' => false,
-            ]
+            ],
         ];
 
         foreach ($timelineEvents as $event) {
@@ -605,7 +607,7 @@ class DatabaseSeeder extends Seeder
                 'priority' => 'normal',
                 'assigned_server' => 'Sarah',
                 'notes' => 'Tembo à température ambiante s\'il vous plaît.',
-            ]
+            ],
         ];
 
         foreach ($orders as $o) {
@@ -631,7 +633,7 @@ class DatabaseSeeder extends Seeder
                 'uploaded_by' => 'Glody Mutombo',
                 'category' => 'ceremony',
                 'is_featured' => false,
-            ]
+            ],
         ];
 
         foreach ($photos as $p) {
@@ -657,7 +659,7 @@ class DatabaseSeeder extends Seeder
                 'type' => 'alert',
                 'target_role' => 'all',
                 'is_read' => false,
-            ]
+            ],
         ];
 
         foreach ($notifications as $n) {

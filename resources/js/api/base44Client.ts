@@ -74,4 +74,21 @@ export const base44 = {
       },
     },
   },
+  public: {
+    async invitation(token: string) {
+      return (await axios.get(`/api/public/invitations/${encodeURIComponent(token)}`)).data;
+    },
+    async respondToInvitation(token: string, data: Record<string, any>) {
+      return (await axios.put(`/api/public/invitations/${encodeURIComponent(token)}`, data)).data;
+    },
+    async createInvitationOrder(token: string, data: Record<string, any>) {
+      return (await axios.post(`/api/public/invitations/${encodeURIComponent(token)}/orders`, data)).data;
+    },
+    async tableMenu(tableId: string) {
+      return (await axios.get(`/api/public/table-menus/${tableId}`)).data;
+    },
+    async createTableOrder(tableId: string, data: Record<string, any>) {
+      return (await axios.post(`/api/public/table-menus/${tableId}/orders`, data)).data;
+    },
+  },
 };

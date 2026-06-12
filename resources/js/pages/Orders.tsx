@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { UtensilsCrossed, Clock, CheckCircle2, XCircle, ArrowRight, AlertTriangle } from 'lucide-react';
+import { UtensilsCrossed, Clock, CheckCircle2, XCircle, ArrowRight, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
+import { useOrderNotificationSound } from '@/hooks/useOrderNotificationSound';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -84,6 +85,7 @@ export default function Orders() {
     enabled: !!activeWeddingId,
     refetchInterval: 5000,
   });
+  const { soundEnabled, toggleSound } = useOrderNotificationSound(orders);
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -113,6 +115,10 @@ export default function Orders() {
   return (
     <div>
       <PageHeader title="Commandes" subtitle={`${counts.pending} en attente · ${counts.in_progress} en cours`}>
+        <Button variant="outline" onClick={toggleSound}>
+          {soundEnabled ? <Volume2 className="mr-2 h-4 w-4" /> : <VolumeX className="mr-2 h-4 w-4" />}
+          Son {soundEnabled ? 'activé' : 'coupé'}
+        </Button>
         <WeddingSelector weddings={weddings} activeWeddingId={activeWeddingId} onSelect={setActiveWeddingId} />
       </PageHeader>
 

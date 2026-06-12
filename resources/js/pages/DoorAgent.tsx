@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useActiveWedding } from '@/hooks/useWedding';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,52 +7,166 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, Search, CheckCircle2, XCircle, UserCheck, Users, AlertCircle, Map as MapIcon } from 'lucide-react';
+import { Search, CheckCircle2, XCircle, UserCheck, Users, AlertCircle, Map as MapIcon, Camera, CameraOff, ImageUp, LogOut, ScanLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from '@inertiajs/react';
 
-function TableMap({ tables, highlightedTableId }) {
+function TableMap({ tables, highlightedTableId, weddingId }) {
   if (!tables || tables.length === 0) return null;
 
+  let roomPolygon = [];
+  try {
+    roomPolygon = JSON.parse(localStorage.getItem(`room_polygon_${weddingId}`) || '[]');
+  } catch {
+    roomPolygon = [];
+  }
+
   return (
-    <div className="relative w-full aspect-[4/3] bg-stone-100 rounded-xl border border-stone-200 overflow-hidden shadow-inner mt-4">
-      {/* Decorative entrance marker */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-2 bg-stone-300 rounded-t-md" title="Entrée" />
-      
-      {tables.map((t, i) => {
-        // Fallback grid positions if x/y are not set
-        const hasPos = t.position_x > 0 || t.position_y > 0;
-        const fallbackX = 15 + ((i % 3) * 35);
-        const fallbackY = 15 + (Math.floor(i / 3) * 35);
-        const x = hasPos ? t.position_x : fallbackX;
-        const y = hasPos ? t.position_y : fallbackY;
-        
+    <div className="mt-4 overflow-auto rounded-2xl border border-stone-200 bg-slate-50 shadow-inner">
+      <svg viewBox="0 0 700 500" className="min-h-[420px] w-full min-w-[700px]" aria-label="Plan de la salle">
+        <defs>
+          <pattern id="door-grid" width="25" height="25" patternUnits="userSpaceOnUse">
+            <path d="M 25 0 L 0 0 0 25" fill="none" stroke="#e2e8f0" strokeWidth="0.7" />
+          </pattern>
+          <filter id="table-shadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="4" stdDeviation="4" floodOpacity=".16" />
+          </filter>
+        </defs>
+        <rect width="700" height="500" fill="url(#door-grid)" />
+        {roomPolygon.length >= 3 && (
+          <polygon
+            points={roomPolygon.map(point => `${point.x},${point.y}`).join(' ')}
+            fill="#fff"
+            stroke="#a8a29e"
+            strokeWidth="4"
+            strokeLinejoin="round"
+          />
+        )}
+        <g transform="translate(305 466)">
+          <rect width="90" height="18" rx="7" fill="#d6d3d1" />
+          <text x="45" y="13" textAnchor="middle" fontSize="10" fontWeight="700" fill="#57534e">ENTRÉE</text>
+        </g>
+        {tables.map((t, i) => {
+        const x = t.position_x > 0 ? t.position_x : 100 + (i % 4) * 150;
+        const y = t.position_y > 0 ? t.position_y : 90 + Math.floor(i / 4) * 120;
         const isHighlighted = t.id === highlightedTableId;
+        const rectangular = t.shape === 'rectangular' || t.shape === 'rectangle';
+        const width = rectangular ? 104 : 78;
+        const height = rectangular ? 62 : 78;
 
         return (
-          <div 
-            key={t.id} 
-            className={cn(
-              "absolute flex flex-col items-center justify-center rounded-full shadow-sm transition-all duration-500", 
-              isHighlighted 
-                ? "bg-primary text-white scale-110 z-20 shadow-lg ring-4 ring-primary/30" 
-                : "bg-white text-stone-600 border-2 border-stone-200 z-10 opacity-70",
-              t.shape === 'rectangular' ? "rounded-md" : "rounded-full"
+          <g key={t.id} transform={`translate(${x - width / 2} ${y - height / 2})`} filter="url(#table-shadow)">
+            {rectangular ? (
+              <rect width={width} height={height} rx="12" fill={isHighlighted ? '#8b1e1e' : '#fff'} stroke={isHighlighted ? '#fca5a5' : '#d6d3d1'} strokeWidth={isHighlighted ? 5 : 2} />
+            ) : (
+              <ellipse cx={width / 2} cy={height / 2} rx={width / 2} ry={height / 2} fill={isHighlighted ? '#8b1e1e' : '#fff'} stroke={isHighlighted ? '#fca5a5' : '#d6d3d1'} strokeWidth={isHighlighted ? 5 : 2} />
             )}
-            style={{ 
-              left: `${x}%`, 
-              top: `${y}%`,
-              width: '4rem',
-              height: t.shape === 'rectangular' ? '3rem' : '4rem',
-              transform: 'translate(-50%, -50%)'
-            }}
-          >
-            <span className="text-xs font-bold px-1 text-center truncate w-full">{t.name}</span>
-            {isHighlighted && <span className="text-[10px] opacity-80">Votre table</span>}
-          </div>
+            <text x={width / 2} y={height / 2 - (isHighlighted ? 3 : -3)} textAnchor="middle" fontSize="11" fontWeight="700" fill={isHighlighted ? '#fff' : '#44403c'}>
+              {t.name.length > 18 ? `${t.name.slice(0, 16)}…` : t.name}
+            </text>
+            {isHighlighted && <text x={width / 2} y={height / 2 + 15} textAnchor="middle" fontSize="9" fill="#fecaca">TABLE DE L’INVITÉ</text>}
+          </g>
         );
       })}
+      </svg>
     </div>
+  );
+}
+
+function QrScanner({ onScan }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<number | null>(null);
+  const [active, setActive] = useState(false);
+  const [error, setError] = useState('');
+
+  const stop = () => {
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    timerRef.current = null;
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
+    setActive(false);
+  };
+
+  useEffect(() => stop, []);
+
+  const start = async () => {
+    setError('');
+    const Detector = (window as any).BarcodeDetector;
+    if (!Detector) {
+      setError('Le scan caméra n’est pas pris en charge ici. Importez une photo du QR code.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      if (!videoRef.current) return;
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+      setActive(true);
+      const detector = new Detector({ formats: ['qr_code'] });
+      timerRef.current = window.setInterval(async () => {
+        if (!videoRef.current || videoRef.current.readyState < 2) return;
+        try {
+          const codes = await detector.detect(videoRef.current);
+          if (codes[0]?.rawValue) {
+            onScan(codes[0].rawValue);
+            stop();
+          }
+        } catch {
+          // The next frame will retry.
+        }
+      }, 400);
+    } catch {
+      setError('Accès à la caméra refusé ou indisponible.');
+      stop();
+    }
+  };
+
+  const scanImage = async (file?: File) => {
+    if (!file) return;
+    const Detector = (window as any).BarcodeDetector;
+    if (!Detector) {
+      setError('Ce navigateur ne peut pas lire le QR. Utilisez Chrome ou Edge récent.');
+      return;
+    }
+    try {
+      const bitmap = await createImageBitmap(file);
+      const codes = await new Detector({ formats: ['qr_code'] }).detect(bitmap);
+      if (!codes[0]?.rawValue) throw new Error();
+      onScan(codes[0].rawValue);
+    } catch {
+      setError('Aucun QR code lisible dans cette image.');
+    }
+  };
+
+  return (
+    <Card className="overflow-hidden border-primary/20 shadow-sm">
+      <CardContent className="space-y-4 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 font-medium text-stone-700">
+            <ScanLine className="h-5 w-5 text-primary" />
+            Scanner le QR de l’invité
+          </div>
+          <Button variant={active ? 'destructive' : 'default'} size="sm" onClick={active ? stop : start}>
+            {active ? <CameraOff className="mr-2 h-4 w-4" /> : <Camera className="mr-2 h-4 w-4" />}
+            {active ? 'Arrêter' : 'Ouvrir la caméra'}
+          </Button>
+        </div>
+        <div className={cn('relative overflow-hidden rounded-xl bg-stone-950', active ? 'aspect-video' : 'hidden')}>
+          <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
+          <div className="pointer-events-none absolute inset-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-2xl border-2 border-white shadow-[0_0_0_999px_rgba(0,0,0,.3)]" />
+        </div>
+        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-stone-300 px-4 py-3 text-sm text-stone-600 hover:bg-stone-50">
+          <ImageUp className="h-4 w-4" />
+          Importer une photo du QR code
+          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={event => scanImage(event.target.files?.[0])} />
+        </label>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -94,6 +208,22 @@ export default function DoorAgent() {
     setSearch('');
   };
 
+  const handleQrScan = (value: string) => {
+    let token = value.trim();
+    try {
+      const url = new URL(value);
+      token = url.searchParams.get('invite') || value;
+    } catch {
+      // A plain invitation reference is valid too.
+    }
+    const guest = guests.find(item => item.invitation_link === token || item.qr_code === token);
+    if (!guest) {
+      setScanResult({ guest: { first_name: 'QR', last_name: 'inconnu', status: 'introuvable' }, status: 'not_found' });
+      return;
+    }
+    handleCheck(guest);
+  };
+
   const confirmEntry = async (guest) => {
     await markPresent.mutateAsync(guest.id);
     setScanResult({ guest: { ...guest, status: 'confirmed' }, status: 'done' });
@@ -108,19 +238,24 @@ export default function DoorAgent() {
   return (
     <div className="min-h-screen bg-stone-50 pb-10">
       <div className="bg-white border-b border-stone-200 px-4 py-4 sticky top-0 z-40 shadow-sm">
-        <div className="flex items-center justify-between max-w-lg mx-auto">
+        <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div>
             <h1 className="font-display text-xl font-semibold text-stone-800">Contrôle d'entrée</h1>
             <p className="text-xs text-stone-500">Agent d'accueil</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setShowFullMap(!showFullMap)}>
-            <MapIcon className="w-4 h-4 mr-2 text-primary" />
-            Plan de salle
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowFullMap(!showFullMap)}>
+              <MapIcon className="w-4 h-4 mr-2 text-primary" />
+              Plan de salle
+            </Button>
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/logout" method="post" as="button"><LogOut className="h-4 w-4" /></Link>
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="p-4 max-w-lg mx-auto space-y-6 mt-2">
+      <div className="p-4 max-w-6xl mx-auto space-y-6 mt-2">
         <WeddingSelector weddings={weddings} activeWeddingId={activeWeddingId} onSelect={setActiveWeddingId} />
 
         {/* Stats */}
@@ -147,7 +282,7 @@ export default function DoorAgent() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 bg-white">
-              <TableMap tables={tables} highlightedTableId={null} />
+              <TableMap tables={tables} highlightedTableId={null} weddingId={activeWeddingId} />
             </CardContent>
           </Card>
         )}
@@ -186,7 +321,7 @@ export default function DoorAgent() {
                       {scanResult.guest.table_id ? (
                         <div className="mt-6 pt-6 border-t border-green-200">
                           <p className="font-medium text-stone-700 mb-2">Orientez l'invité vers sa table :</p>
-                          <TableMap tables={tables} highlightedTableId={scanResult.guest.table_id} />
+                          <TableMap tables={tables} highlightedTableId={scanResult.guest.table_id} weddingId={activeWeddingId} />
                         </div>
                       ) : (
                         <p className="text-sm text-stone-500 mt-4 italic">Aucune table assignée pour le moment.</p>
@@ -203,7 +338,7 @@ export default function DoorAgent() {
                       
                       {scanResult.guest.table_id && (
                         <div className="mt-6 pt-4 border-t border-blue-200">
-                          <TableMap tables={tables} highlightedTableId={scanResult.guest.table_id} />
+                          <TableMap tables={tables} highlightedTableId={scanResult.guest.table_id} weddingId={activeWeddingId} />
                         </div>
                       )}
                     </>
@@ -215,14 +350,23 @@ export default function DoorAgent() {
                       <div className="text-stone-600">{scanResult.guest.first_name} {scanResult.guest.last_name} — Statut : {scanResult.guest.status}</div>
                     </>
                   )}
+                  {scanResult.status === 'not_found' && (
+                    <>
+                      <XCircle className="mx-auto mb-2 h-12 w-12 text-red-600" />
+                      <div className="font-display text-xl font-semibold text-red-700">QR code non reconnu</div>
+                      <div className="text-stone-600">Cette référence ne correspond à aucun invité de ce mariage.</div>
+                    </>
+                  )}
                 </div>
               </Card>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Search */}
-        <Card className="border-stone-200 shadow-sm">
+        <div className="grid items-start gap-6 lg:grid-cols-2">
+          <QrScanner onScan={handleQrScan} />
+          {/* Search */}
+          <Card className="border-stone-200 shadow-sm">
           <CardContent className="pt-5 space-y-4">
             <div className="flex items-center gap-2 text-stone-700">
               <Search className="w-5 h-5 text-primary" />
@@ -246,7 +390,8 @@ export default function DoorAgent() {
               </div>
             )}
           </CardContent>
-        </Card>
+          </Card>
+        </div>
 
         {/* Guest list */}
         <Card className="border-stone-200 shadow-sm">

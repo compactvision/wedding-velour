@@ -3,24 +3,27 @@ import { Link, usePage } from '@inertiajs/react';
 import {
   LayoutDashboard, Users, UtensilsCrossed, Clock, Camera,
   Bell, TableProperties, Heart, ChevronLeft, ChevronRight, LogOut,
-  MenuSquare, ShieldCheck, TrendingUp,
+  MenuSquare, ShieldCheck, TrendingUp, UserCog,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'Tableau de bord' },
-  { path: '/guests', icon: Users, label: 'Invités' },
-  { path: '/tables', icon: TableProperties, label: 'Plan de salle' },
-  { path: '/menu-admin', icon: MenuSquare, label: 'Menu' },
-  { path: '/orders', icon: UtensilsCrossed, label: 'Commandes' },
-  { path: '/timeline', icon: Clock, label: 'Programme' },
-  { path: '/photos', icon: Camera, label: 'Galerie' },
-  { path: '/notifications', icon: Bell, label: 'Notifications' },
-  { path: '/manager', icon: TrendingUp, label: 'Vue Manager' },
+  { path: '/', icon: LayoutDashboard, label: 'Tableau de bord', roles: ['admin', 'manager'] },
+  { path: '/guests', icon: Users, label: 'Invités', roles: ['admin', 'manager'] },
+  { path: '/tables', icon: TableProperties, label: 'Plan de salle', roles: ['admin', 'manager'] },
+  { path: '/menu-admin', icon: MenuSquare, label: 'Menu', roles: ['admin', 'manager'] },
+  { path: '/orders', icon: UtensilsCrossed, label: 'Commandes', roles: ['admin', 'manager'] },
+  { path: '/timeline', icon: Clock, label: 'Programme', roles: ['admin', 'manager'] },
+  { path: '/photos', icon: Camera, label: 'Galerie', roles: ['admin', 'manager'] },
+  { path: '/notifications', icon: Bell, label: 'Notifications', roles: ['admin', 'manager'] },
+  { path: '/manager', icon: TrendingUp, label: 'Vue Manager', roles: ['admin', 'manager'] },
+  { path: '/agents', icon: UserCog, label: 'Équipe & accès', roles: ['admin'] },
 ];
 
 export default function Sidebar({ collapsed, onToggle }) {
-  const { url } = usePage();
+  const { url, props } = usePage();
+  const user = (props as any).auth?.user;
+  const visibleNavItems = navItems.filter(item => item.roles.includes(user?.role));
 
   return (
     <aside className={cn(
@@ -39,7 +42,7 @@ export default function Sidebar({ collapsed, onToggle }) {
 
       {/* Navigation */}
       <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-        {navItems.map(({ path, icon: Icon, label }) => {
+        {visibleNavItems.map(({ path, icon: Icon, label }) => {
           const isActive = path === '/' ? url === '/' : url.startsWith(path);
           return (
             <Link
@@ -61,14 +64,24 @@ export default function Sidebar({ collapsed, onToggle }) {
 
       {/* Footer */}
       <div className="p-2 border-t border-border space-y-1">
-        <Link href="/server" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-accent hover:bg-accent/10 transition-colors">
-          <UtensilsCrossed className="w-5 h-5 shrink-0" />
-          {!collapsed && <span>Mode Serveur</span>}
-        </Link>
-        <Link href="/door" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 transition-colors">
-          <ShieldCheck className="w-5 h-5 shrink-0" />
-          {!collapsed && <span>Agent à la porte</span>}
-        </Link>
+        {['admin', 'server'].includes(user?.role) && (
+          <Link href="/server" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-accent hover:bg-accent/10 transition-colors">
+            <UtensilsCrossed className="w-5 h-5 shrink-0" />
+            {!collapsed && <span>Mode Serveur</span>}
+          </Link>
+        )}
+        {['admin', 'door'].includes(user?.role) && (
+          <Link href="/door" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 transition-colors">
+            <ShieldCheck className="w-5 h-5 shrink-0" />
+            {!collapsed && <span>Agent à la porte</span>}
+          </Link>
+        )}
+        {!collapsed && user && (
+          <div className="px-3 py-2 text-xs text-muted-foreground">
+            <div className="truncate font-medium text-foreground">{user.name}</div>
+            <div className="capitalize">{user.role}</div>
+          </div>
+        )}
         <Link
           href="/logout"
           method="post"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,8 +17,6 @@ import { cn } from '@/lib/utils';
 export default function GuestPortal() {
   const urlParams = new URLSearchParams(window.location.search);
   const inviteToken = urlParams.get('invite');
-  const queryClient = useQueryClient();
-
   const [guest, setGuest] = useState(null);
   const [wedding, setWedding] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -29,50 +27,41 @@ export default function GuestPortal() {
   useEffect(() => {
     async function loadGuest() {
       if (!inviteToken) { setLoading(false); return; }
-      const guests = await base44.entities.Guest.filter({ invitation_link: inviteToken });
-      if (guests.length > 0) {
-        setGuest(guests[0]);
-        const allWeddings = await base44.entities.Wedding.list();
-        const weddings = allWeddings.filter(w => w.id === guests[0].wedding_id);
-        if (weddings.length > 0) setWedding(weddings[0]);
+      try {
+        const data = await base44.public.invitation(inviteToken);
+        setGuest(data.guest);
+        setWedding(data.wedding);
+        setPublicTimeline(data.timeline || []);
+        setPublicOrders(data.orders || []);
+      } catch {
+        setGuest(null);
       }
       setLoading(false);
     }
     loadGuest();
   }, [inviteToken]);
 
-  const { data: timeline = [] } = useQuery({
-    queryKey: ['guest-timeline', guest?.wedding_id],
-    queryFn: () => base44.entities.TimelineEvent.filter({ wedding_id: guest?.wedding_id }),
-    enabled: !!guest?.wedding_id,
-  });
+  const [publicTimeline, setPublicTimeline] = useState([]);
+  const [publicOrders, setPublicOrders] = useState([]);
 
-  const { data: myOrders = [] } = useQuery({
-    queryKey: ['guest-orders', guest?.id],
-    queryFn: () => base44.entities.Order.filter({ guest_id: guest?.id }, '-created_date'),
-    enabled: !!guest?.id,
-  });
+  const timeline = publicTimeline;
+  const myOrders = publicOrders;
 
   const rsvpMutation = useMutation({
-    mutationFn: ({ status }) => base44.entities.Guest.update(guest.id, { status, rsvp_message: rsvpMessage }),
-    onSuccess: (_, { status }) => setGuest(prev => ({ ...prev, status })),
+    mutationFn: ({ status }: { status: string }) => base44.public.respondToInvitation(inviteToken!, { status, rsvp_message: rsvpMessage }),
+    onSuccess: (_: any, { status }: { status: string }) => setGuest((prev: any) => ({ ...prev, status })),
   });
 
   const orderMutation = useMutation({
-    mutationFn: (data) => base44.entities.Order.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['guest-orders', guest?.id] });
+    mutationFn: (data: Record<string, any>) => base44.public.createInvitationOrder(inviteToken!, data),
+    onSuccess: (order: any) => {
+      setPublicOrders((prev: any[]) => [order, ...prev]);
       setOrderForm({ type: 'drink', description: '', notes: '' });
     },
   });
 
   const handleOrder = () => {
     orderMutation.mutate({
-      wedding_id: guest.wedding_id,
-      table_id: guest.table_id || '',
-      table_name: guest.table_id ? `Table de ${guest.first_name}` : 'Non assigné',
-      guest_id: guest.id,
-      guest_name: `${guest.first_name} ${guest.last_name}`,
       ...orderForm,
     });
   };

@@ -1,21 +1,29 @@
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useState, useEffect } from 'react';
+import { usePage } from '@inertiajs/react';
 
 export function useWeddings() {
   return useQuery({
     queryKey: ['weddings'],
-    queryFn: () => base44.entities.Wedding.list('-created_date'),
+    queryFn: () => base44.entities.Wedding.list(),
     initialData: [],
   });
 }
 
 export function useActiveWedding() {
+  const userWeddingId = (usePage().props as any).auth?.user?.wedding_id || null;
   const [activeWeddingId, setActiveWeddingId] = useState(() => {
-    return localStorage.getItem('activeWeddingId') || null;
+    return userWeddingId || localStorage.getItem('activeWeddingId') || null;
   });
 
   const { data: weddings, isLoading } = useWeddings();
+
+  useEffect(() => {
+    if (userWeddingId && activeWeddingId !== userWeddingId) {
+      setActiveWeddingId(userWeddingId);
+    }
+  }, [userWeddingId, activeWeddingId]);
 
   useEffect(() => {
     if (!activeWeddingId && weddings?.length > 0) {
@@ -35,7 +43,7 @@ export function useActiveWedding() {
     weddings,
     activeWedding,
     activeWeddingId: activeWedding?.id,
-    setActiveWeddingId,
+    setActiveWeddingId: userWeddingId ? () => {} : setActiveWeddingId,
     isLoading,
   };
 }

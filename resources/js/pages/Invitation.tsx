@@ -4,7 +4,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { Heart, MapPin, CalendarDays, Clock, GlassWater, Utensils, CheckCircle2, XCircle, Users, MailOpen, ChefHat, Check, Sparkles } from 'lucide-react';
+import { Heart, MapPin, CalendarDays, Clock, GlassWater, Utensils, CheckCircle2, XCircle, Users, MailOpen, ChefHat, Check, Sparkles, Download, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -47,30 +48,18 @@ export default function Invitation() {
     async function load() {
       if (!inviteToken) { setLoading(false); return; }
       
-      const guests = await base44.entities.Guest.filter({ invitation_link: inviteToken });
-      
-      if (guests.length > 0) {
-        const currentGuest = guests[0];
+      try {
+        const invitation = await base44.public.invitation(inviteToken);
+        const currentGuest = invitation.guest;
         setGuest(currentGuest);
         setMenuPreferences(currentGuest.menu_preferences || []);
-
-        const [allWeddings, allTimeline, allTables, tableGuests, weddingMenuItems] = await Promise.all([
-          base44.entities.Wedding.list(),
-          base44.entities.TimelineEvent.filter({ wedding_id: currentGuest.wedding_id }),
-          currentGuest.table_id ? base44.entities.WeddingTable.filter({ id: currentGuest.table_id }) : Promise.resolve([]),
-          currentGuest.table_id ? base44.entities.Guest.filter({ table_id: currentGuest.table_id }) : Promise.resolve([]),
-          base44.entities.MenuItem.filter({ wedding_id: currentGuest.wedding_id }),
-        ]);
-
-        const w = allWeddings.find(w => w.id === currentGuest.wedding_id);
-        if (w) setWedding(w);
-
-        // Sort timeline
-        setTimeline(allTimeline.sort((a, b) => a.time.localeCompare(b.time)));
-        setMenuItems(weddingMenuItems.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
-        
-        if (allTables.length > 0) setTable(allTables[0]);
-        setCoGuests(tableGuests.filter(g => g.id !== currentGuest.id));
+        setWedding(invitation.wedding);
+        setTimeline(invitation.timeline || []);
+        setMenuItems(invitation.menu_items || []);
+        setTable(invitation.table);
+        setCoGuests(invitation.co_guests || []);
+      } catch {
+        setGuest(null);
       }
       setLoading(false);
     }
@@ -85,12 +74,11 @@ export default function Invitation() {
   const handleRSVP = async (status: string) => {
     setIsSubmitting(true);
     try {
-      await base44.entities.Guest.update(guest.id, {
-        ...guest,
+      const updatedGuest = await base44.public.respondToInvitation(inviteToken, {
         status,
         menu_preferences: menuPreferences,
       });
-      setGuest({ ...guest, status, menu_preferences: menuPreferences });
+      setGuest(updatedGuest);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
     } catch (e) {
@@ -133,6 +121,41 @@ export default function Invitation() {
       }
       return [...prev, itemId];
     });
+  };
+
+  const invitationUrl = `${window.location.origin}/invitation?invite=${inviteToken}`;
+  const downloadGuestQr = () => {
+    const svg = document.querySelector('#guest-invitation-qr svg');
+    if (!svg) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 720;
+    canvas.height = 820;
+    const context = canvas.getContext('2d');
+    const image = new Image();
+    const svgData = new XMLSerializer().serializeToString(svg);
+
+    image.onload = () => {
+      if (!context) return;
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#1c1917';
+      context.textAlign = 'center';
+      context.font = '600 30px serif';
+      context.fillText(wedding.title, canvas.width / 2, 55);
+      context.font = '500 24px sans-serif';
+      context.fillText(`${guest.first_name} ${guest.last_name}`, canvas.width / 2, 95);
+      context.drawImage(image, 110, 130, 500, 500);
+      context.font = '500 20px monospace';
+      context.fillText(`Référence : ${inviteToken}`, canvas.width / 2, 690);
+      context.font = '18px sans-serif';
+      context.fillStyle = '#78716c';
+      context.fillText('Présentez ce code à l’agent d’accueil', canvas.width / 2, 735);
+      const link = document.createElement('a');
+      link.download = `qr-${guest.first_name}-${guest.last_name}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    };
+    image.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgData)))}`;
   };
 
   return (
@@ -313,6 +336,24 @@ export default function Invitation() {
                   )}
                 </div>
               )}
+
+              <div className="rounded-3xl border border-primary/15 bg-primary/5 p-6 text-center md:p-10">
+                <QrCode className="mx-auto mb-3 h-7 w-7 text-primary" />
+                <h3 className="font-display text-2xl text-stone-800">Votre code d’accès</h3>
+                <p className="mx-auto mt-2 max-w-md text-sm text-stone-500">
+                  Ce QR code est votre référence personnelle. Présentez-le à l’entrée pour être identifié rapidement.
+                </p>
+                <div id="guest-invitation-qr" className="mx-auto mt-6 w-fit rounded-2xl bg-white p-4 shadow-md">
+                  <QRCodeSVG value={invitationUrl} size={220} level="H" includeMargin />
+                </div>
+                <p className="mt-4 font-mono text-xs font-semibold tracking-wider text-stone-600">
+                  RÉF. {inviteToken}
+                </p>
+                <Button type="button" variant="outline" className="mt-5 rounded-xl" onClick={downloadGuestQr}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Télécharger mon QR code
+                </Button>
+              </div>
 
               {/* Form Section */}
               <div className="bg-white rounded-3xl p-6 md:p-10 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-stone-100 relative overflow-hidden">

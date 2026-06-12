@@ -9,12 +9,13 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   UtensilsCrossed, ArrowRight, CheckCircle2, XCircle, AlertTriangle, 
-  Clock, Heart, ArrowLeft, Bell
+  Clock, Heart, ArrowLeft, Bell, Volume2, VolumeX, LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Link } from '@inertiajs/react';
+import { useOrderNotificationSound } from '@/hooks/useOrderNotificationSound';
 
 const typeEmojis = { drink: '🍷', food: '🍽️', dessert: '🍰', special_request: '✨' };
 const priorityBorders = { low: 'border-l-gray-300', normal: 'border-l-blue-400', high: 'border-l-amber-400', urgent: 'border-l-red-500' };
@@ -30,6 +31,7 @@ export default function ServerInterface() {
     enabled: !!activeWeddingId,
     refetchInterval: 3000,
   });
+  const { soundEnabled, toggleSound } = useOrderNotificationSound(orders);
 
   useEffect(() => {
     if (!activeWeddingId) return;
@@ -66,12 +68,19 @@ export default function ServerInterface() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={toggleSound} title="Activer ou couper le son">
+              {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              <span className="ml-2 hidden sm:inline">Son</span>
+            </Button>
             {pendingCount > 0 && (
               <Badge variant="destructive" className="animate-pulse">
                 <Bell className="w-3 h-3 mr-1" />
                 {pendingCount} en attente
               </Badge>
             )}
+            <Link href="/logout" method="post" as="button" className="rounded-lg p-2 text-muted-foreground hover:bg-muted">
+              <LogOut className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </header>
