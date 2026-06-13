@@ -1,7 +1,12 @@
-const CACHE_NAME = 'wedding-velour-v3';
+const CACHE_NAME = 'wedding-velour-v4';
 const APP_SHELL = [
   '/assets/images/logo.png',
   '/assets/images/logo-without-brand.png',
+  '/assets/icons/icon-192.png',
+  '/assets/icons/icon-512.png',
+  '/assets/icons/icon-maskable-512.png',
+  '/apple-touch-icon.png',
+  '/favicon.ico',
   '/manifest.webmanifest',
 ];
 
