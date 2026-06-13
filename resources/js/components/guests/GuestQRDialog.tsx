@@ -2,7 +2,8 @@ import React, { useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { QRCodeSVG } from 'qrcode.react';
-import { Heart, Download, Mail, MessageCircle, Phone, Copy, Check } from 'lucide-react';
+import { Download, Mail, MessageCircle, Phone, Copy, Check } from 'lucide-react';
+import BrandLogo from '@/components/shared/BrandLogo';
 import { useState } from 'react';
 
 export default function GuestQRDialog({ open, onOpenChange, guest, wedding }) {
@@ -74,7 +75,7 @@ export default function GuestQRDialog({ open, onOpenChange, guest, wedding }) {
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="font-display flex items-center gap-2">
-            <Heart className="w-4 h-4 text-primary" fill="currentColor" />
+            <BrandLogo variant="mark" className="h-8 w-8" />
             Invitation de {guestName}
           </DialogTitle>
         </DialogHeader>

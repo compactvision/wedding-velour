@@ -97,7 +97,7 @@ export default function Dashboard() {
       <div className="min-h-[80vh] flex items-center justify-center">
         <EmptyState
           icon={Heart}
-          title="Bienvenue sur WedPlanner"
+          title="Bienvenue sur Wedding Velour"
           description="Créez votre premier mariage pour commencer l'organisation"
           actionLabel="Créer un mariage"
           onAction={() => setShowNewWedding(true)}

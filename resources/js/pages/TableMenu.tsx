@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { Heart, Wine, UtensilsCrossed, IceCream, Sparkles, Send, CheckCircle2, Clock } from 'lucide-react';
+import { Wine, UtensilsCrossed, IceCream, Sparkles, Send, CheckCircle2, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import OfflineStatus from '@/components/shared/OfflineStatus';
+import BrandLogo from '@/components/shared/BrandLogo';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 const CATEGORY_MAP = {
@@ -87,7 +88,7 @@ export default function TableMenu() {
   if (!table) return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="max-w-sm w-full p-8 text-center">
-        <Heart className="w-12 h-12 mx-auto text-primary mb-4" />
+        <BrandLogo variant="mark" className="mx-auto mb-4 h-24 w-24" />
         <h1 className="font-display text-xl font-semibold">Table introuvable</h1>
         <p className="text-muted-foreground mt-2 text-sm">Ce QR code n'est pas valide.</p>
       </Card>
@@ -103,7 +104,7 @@ export default function TableMenu() {
         </div>
         <div className="flex items-center justify-center gap-3 mb-3">
           <div className="h-px w-10 bg-primary/40" />
-          <Heart className="w-5 h-5 text-primary" fill="currentColor" />
+          <BrandLogo variant="mark" className="h-20 w-20" />
           <div className="h-px w-10 bg-primary/40" />
         </div>
         <h1 className="font-display text-2xl font-semibold text-foreground">{wedding?.title || 'Mariage'}</h1>

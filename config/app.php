@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'admin_password' => env('ADMIN_PASSWORD', 'ChangeMeNow!2026'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

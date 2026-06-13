@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   UtensilsCrossed, ArrowRight, CheckCircle2, XCircle, AlertTriangle, 
-  Clock, Heart, ArrowLeft, Bell, Volume2, VolumeX, LogOut
+  Clock, ArrowLeft, Bell, Volume2, VolumeX, LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -17,6 +17,7 @@ import { fr } from 'date-fns/locale';
 import { Link } from '@inertiajs/react';
 import { useOrderNotificationSound } from '@/hooks/useOrderNotificationSound';
 import OfflineStatus from '@/components/shared/OfflineStatus';
+import BrandLogo from '@/components/shared/BrandLogo';
 
 const typeEmojis = { drink: '🍷', food: '🍽️', dessert: '🍰', special_request: '✨' };
 const priorityBorders = { low: 'border-l-gray-300', normal: 'border-l-blue-400', high: 'border-l-amber-400', urgent: 'border-l-red-500' };
@@ -69,7 +70,7 @@ export default function ServerInterface() {
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <Heart className="w-4 h-4 text-primary" fill="currentColor" />
+                <BrandLogo variant="mark" className="h-8 w-8" />
                 <span className="font-display font-semibold">Mode Serveur</span>
               </div>
               <p className="text-xs text-muted-foreground">{activeWedding?.title}</p>

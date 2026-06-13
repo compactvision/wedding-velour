@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from '@inertiajs/react';
 import OfflineStatus from '@/components/shared/OfflineStatus';
+import BrandLogo from '@/components/shared/BrandLogo';
 
 function TableMap({ tables, highlightedTableId, weddingId }) {
   if (!tables || tables.length === 0) return null;
@@ -247,9 +248,12 @@ export default function DoorAgent() {
     <div className="min-h-screen bg-stone-50 pb-10">
       <div className="bg-white border-b border-stone-200 px-4 py-4 sticky top-0 z-40 shadow-sm">
         <div className="flex items-center justify-between max-w-6xl mx-auto">
-          <div>
-            <h1 className="font-display text-xl font-semibold text-stone-800">Contrôle d'entrée</h1>
-            <p className="text-xs text-stone-500">Agent d'accueil</p>
+          <div className="flex items-center gap-3">
+            <BrandLogo variant="mark" className="h-11 w-11 shrink-0" />
+            <div>
+              <h1 className="font-display text-xl font-semibold text-stone-800">Contrôle d'entrée</h1>
+              <p className="text-xs text-stone-500">Agent d'accueil</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <OfflineStatus compact />

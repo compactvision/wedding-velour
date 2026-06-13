@@ -8,6 +8,7 @@ import { Heart, MapPin, CalendarDays, Clock, GlassWater, Utensils, CheckCircle2,
 import { QRCodeSVG } from 'qrcode.react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import BrandLogo from '@/components/shared/BrandLogo';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { usePage } from '@inertiajs/react';
@@ -100,7 +101,7 @@ export default function Invitation() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-stone-50 px-4">
         <Card className="max-w-md w-full p-10 text-center shadow-2xl border-0 rounded-3xl">
-          <Heart className="w-16 h-16 mx-auto text-primary/40 mb-6" />
+          <BrandLogo variant="mark" className="mx-auto mb-6 h-28 w-28 opacity-70" />
           <h1 className="font-display text-2xl font-medium text-stone-800">Invitation introuvable</h1>
           <p className="text-stone-500 mt-3">Ce lien n'est pas valide ou a expiré.</p>
         </Card>
@@ -186,7 +187,7 @@ export default function Invitation() {
                 transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
               >
                 <div className="text-center opacity-40">
-                  <Heart className="w-8 h-8 mx-auto mb-2 text-primary" fill="currentColor" />
+                  <BrandLogo variant="mark" className="mx-auto mb-2 h-16 w-16" />
                   <p className="font-display text-xs tracking-widest">{wedding.title}</p>
                 </div>
               </motion.div>

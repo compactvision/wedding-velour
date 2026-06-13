@@ -1,6 +1,6 @@
 import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Heart } from 'lucide-react';
+import BrandLogo from '@/components/shared/BrandLogo';
 
 export default function WeddingSelector({ weddings, activeWeddingId, onSelect }) {
   if (!weddings?.length) return null;
@@ -9,7 +9,7 @@ export default function WeddingSelector({ weddings, activeWeddingId, onSelect })
     <Select value={activeWeddingId || ''} onValueChange={onSelect}>
       <SelectTrigger className="w-[220px] bg-card">
         <div className="flex items-center gap-2">
-          <Heart className="w-4 h-4 text-primary" fill="currentColor" />
+          <BrandLogo variant="mark" className="h-5 w-5 shrink-0" />
           <SelectValue placeholder="Sélectionner un mariage" />
         </div>
       </SelectTrigger>

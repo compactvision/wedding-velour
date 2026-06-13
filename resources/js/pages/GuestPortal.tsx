@@ -9,11 +9,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { Heart, CheckCircle2, XCircle, UtensilsCrossed, Send, MapPin, CalendarDays, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, UtensilsCrossed, Send, MapPin, CalendarDays, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import OfflineStatus from '@/components/shared/OfflineStatus';
+import BrandLogo from '@/components/shared/BrandLogo';
 
 export default function GuestPortal() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -79,7 +80,7 @@ export default function GuestPortal() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <Card className="max-w-md w-full p-8 text-center">
-          <Heart className="w-12 h-12 mx-auto text-primary mb-4" />
+          <BrandLogo variant="mark" className="mx-auto mb-4 h-24 w-24" />
           <h1 className="font-display text-2xl font-semibold">Invitation invalide</h1>
           <p className="text-muted-foreground mt-2">Ce lien d'invitation n'est pas valide ou a expiré.</p>
         </Card>
@@ -96,7 +97,7 @@ export default function GuestPortal() {
         <div className="absolute right-4 top-4">
           <OfflineStatus />
         </div>
-        <Heart className="w-10 h-10 mx-auto text-primary mb-3" fill="currentColor" />
+        <BrandLogo variant="mark" className="mx-auto mb-3 h-24 w-24" />
         <h1 className="font-display text-3xl md:text-4xl font-semibold text-foreground">{wedding?.title || 'Mariage'}</h1>
         {wedding?.date && (
           <p className="mt-2 text-muted-foreground flex items-center justify-center gap-2">

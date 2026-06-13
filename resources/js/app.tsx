@@ -2,18 +2,22 @@ import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import AppLayout from './components/layout/AppLayout';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import BrandLogo from './components/shared/BrandLogo';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
-const appElement = document.getElementById('app');
+const isBrowser =
+    typeof window !== 'undefined' && typeof document !== 'undefined';
+const appElement = isBrowser ? document.getElementById('app') : null;
 const initialPage = appElement?.dataset.page
     ? JSON.parse(appElement.dataset.page)
     : null;
 const configuredAppUrl = initialPage?.props?.app_url;
 const isSandboxedPreview =
-    window.location.origin === 'null' ||
-    !['http:', 'https:'].includes(window.location.protocol);
+    isBrowser &&
+    (window.location.origin === 'null' ||
+        !['http:', 'https:'].includes(window.location.protocol));
 
-if (!isSandboxedPreview && import.meta.env.PROD) {
+if (isBrowser && !isSandboxedPreview && import.meta.env.PROD) {
     window.addEventListener('load', () => {
         try {
             if ('serviceWorker' in navigator) {
@@ -35,7 +39,9 @@ const queryClient = new QueryClient({
     },
 });
 
-if (isSandboxedPreview) {
+if (!isBrowser || !appElement) {
+    // Vite imports this client entry while warming the Inertia SSR graph.
+} else if (isSandboxedPreview) {
     const root = createRoot(appElement!);
     const targetUrl =
         typeof configuredAppUrl === 'string' &&
@@ -46,6 +52,7 @@ if (isSandboxedPreview) {
     root.render(
         <div className="flex min-h-screen items-center justify-center bg-stone-50 px-6">
             <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+                <BrandLogo variant="full" className="mx-auto mb-4 h-36 w-64" />
                 <h1 className="font-display text-2xl font-semibold text-stone-800">
                     Ouvrir Wedding Velour
                 </h1>

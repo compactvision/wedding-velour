@@ -1,10 +1,11 @@
 import React, { FormEvent, useState } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Heart, LockKeyhole, Mail } from 'lucide-react';
+import { LockKeyhole, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import BrandLogo from '@/components/shared/BrandLogo';
 
 export default function Login() {
   const { errors } = usePage().props as any;
@@ -26,9 +27,7 @@ export default function Login() {
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-stone-950 via-stone-900 to-primary/40 px-4">
         <Card className="w-full max-w-md border-white/10 bg-white/95 shadow-2xl backdrop-blur">
           <CardHeader className="space-y-4 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-              <Heart className="h-7 w-7 text-primary" fill="currentColor" />
-            </div>
+            <BrandLogo variant="full" className="mx-auto h-44 w-72" />
             <div>
               <CardTitle className="font-display text-2xl">Espace équipe</CardTitle>
               <p className="mt-2 text-sm text-muted-foreground">

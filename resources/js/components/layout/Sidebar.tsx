@@ -2,10 +2,11 @@ import React from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import {
   LayoutDashboard, Users, UtensilsCrossed, Clock, Camera,
-  Bell, TableProperties, Heart, ChevronLeft, ChevronRight, LogOut,
+  Bell, TableProperties, ChevronLeft, ChevronRight, LogOut,
   MenuSquare, ShieldCheck, TrendingUp, UserCog,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import BrandLogo from '@/components/shared/BrandLogo';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Tableau de bord', roles: ['admin', 'manager'] },
@@ -31,13 +32,11 @@ export default function Sidebar({ collapsed, onToggle }) {
       collapsed ? "w-16" : "w-64"
     )}>
       {/* Logo */}
-      <div className="h-16 flex items-center px-4 border-b border-border">
-        <Heart className="w-6 h-6 text-primary shrink-0" fill="currentColor" />
-        {!collapsed && (
-          <span className="ml-3 font-display text-lg font-semibold text-foreground tracking-tight">
-            WedPlanner
-          </span>
-        )}
+      <div className="flex h-20 items-center justify-center overflow-hidden border-b border-border px-2">
+        <BrandLogo
+          variant={collapsed ? 'mark' : 'full'}
+          className={collapsed ? 'h-12 w-12' : 'h-20 w-52'}
+        />
       </div>
 
       {/* Navigation */}
