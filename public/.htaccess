@@ -23,3 +23,10 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(?:css|js|mjs|woff|woff2|ttf|otf|webmanifest)$">
+        Header always set Access-Control-Allow-Origin "*"
+        Header always set Cross-Origin-Resource-Policy "cross-origin"
+    </FilesMatch>
+</IfModule>
