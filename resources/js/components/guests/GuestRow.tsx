@@ -1,8 +1,8 @@
+import { MoreHorizontal, Pencil, Trash2, QrCode } from 'lucide-react';
 import React from 'react';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Pencil, Trash2, Mail, QrCode } from 'lucide-react';
 
 const roleLabels = {
   guest: 'Invité',
@@ -14,8 +14,9 @@ const roleLabels = {
   vip: 'VIP',
 };
 
-export default function GuestRow({ guest, onEdit, onDelete, onStatusChange, onShowQR, onInvite }) {
+export default function GuestRow({ guest, onEdit, onDelete, onStatusChange, onShowQR = null, onInvite = null }) {
   const handleInvite = onInvite || onShowQR;
+
   return (
     <tr className="border-b border-border/40 hover:bg-muted/30 transition-colors">
       <td className="py-3 px-4">

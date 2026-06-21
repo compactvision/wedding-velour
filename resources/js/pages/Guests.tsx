@@ -1,18 +1,20 @@
-import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { MessageCircle, Plus, Search, Users } from 'lucide-react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useActiveWedding } from '@/hooks/useWedding';
+import BulkWhatsappInviteDialog from '@/components/guests/BulkWhatsappInviteDialog';
+import GuestFormDialog from '@/components/guests/GuestFormDialog';
+import GuestInviteModal from '@/components/guests/GuestInviteModal';
+import GuestRow from '@/components/guests/GuestRow';
+import EmptyState from '@/components/shared/EmptyState';
 import PageHeader from '@/components/shared/PageHeader';
 import WeddingSelector from '@/components/shared/WeddingSelector';
-import EmptyState from '@/components/shared/EmptyState';
-import GuestFormDialog from '@/components/guests/GuestFormDialog';
-import GuestRow from '@/components/guests/GuestRow';
-import GuestInviteModal from '@/components/guests/GuestInviteModal';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Users } from 'lucide-react';
+import { useActiveWedding } from '@/hooks/useWedding';
+import { buildWhatsappInvitationLink } from '@/lib/guestInvitations';
 
 export default function Guests() {
   const { weddings, activeWedding, activeWeddingId, setActiveWeddingId } = useActiveWedding();
@@ -20,10 +22,11 @@ export default function Guests() {
   const [showForm, setShowForm] = useState(false);
   const [editingGuest, setEditingGuest] = useState(null);
   const [inviteGuest, setInviteGuest] = useState(null);
+  const [showBulkWhatsapp, setShowBulkWhatsapp] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const { data: guests = [], isLoading } = useQuery({
+  const { data: guests = [] } = useQuery({
     queryKey: ['guests', activeWeddingId],
     queryFn: () => base44.entities.Guest.filter({ wedding_id: activeWeddingId }),
     enabled: !!activeWeddingId,
@@ -32,6 +35,7 @@ export default function Guests() {
   const createMutation = useMutation({
     mutationFn: (data) => {
       const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+
       return base44.entities.Guest.create({
         ...data,
         wedding_id: activeWeddingId,
@@ -39,12 +43,19 @@ export default function Guests() {
         invitation_link: generateId()
       });
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['guests', activeWeddingId] }); setShowForm(false); }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['guests', activeWeddingId] });
+      setShowForm(false);
+    }
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Guest.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['guests', activeWeddingId] }); setShowForm(false); setEditingGuest(null); }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['guests', activeWeddingId] });
+      setShowForm(false);
+      setEditingGuest(null);
+    }
   });
 
   const deleteMutation = useMutation({
@@ -60,20 +71,37 @@ export default function Guests() {
     }
   };
 
-  const handleEdit = (guest) => { setEditingGuest(guest); setShowForm(true); };
+  const handleEdit = (guest) => {
+    setEditingGuest(guest);
+    setShowForm(true);
+  };
   const handleStatusChange = (guest, status) => updateMutation.mutate({ id: guest.id, data: { status } });
 
   const filteredGuests = guests.filter(g => {
     const matchesSearch = `${g.first_name} ${g.last_name} ${g.email}`.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || g.status === statusFilter;
+
     return matchesSearch && matchesStatus;
   });
+  const whatsappRecipientCount = activeWedding
+    ? guests.filter(guest => buildWhatsappInvitationLink(guest, activeWedding)).length
+    : 0;
 
   return (
     <div>
       <PageHeader title="Invités" subtitle={`${guests.length} invités · ${guests.filter(g => g.status === 'confirmed').length} confirmés`}>
         <WeddingSelector weddings={weddings} activeWeddingId={activeWeddingId} onSelect={setActiveWeddingId} />
-        <Button onClick={() => { setEditingGuest(null); setShowForm(true); }}>
+        <Button
+          variant="outline"
+          disabled={!activeWedding || whatsappRecipientCount === 0}
+          onClick={() => setShowBulkWhatsapp(true)}
+        >
+          <MessageCircle className="w-4 h-4 mr-1" /> WhatsApp tous
+        </Button>
+        <Button onClick={() => {
+          setEditingGuest(null);
+          setShowForm(true);
+        }}>
           <Plus className="w-4 h-4 mr-1" /> Ajouter
         </Button>
       </PageHeader>
@@ -137,6 +165,12 @@ export default function Guests() {
         open={!!inviteGuest}
         onOpenChange={() => setInviteGuest(null)}
         guest={inviteGuest}
+        wedding={activeWedding}
+      />
+      <BulkWhatsappInviteDialog
+        open={showBulkWhatsapp}
+        onOpenChange={setShowBulkWhatsapp}
+        guests={guests}
         wedding={activeWedding}
       />
     </div>

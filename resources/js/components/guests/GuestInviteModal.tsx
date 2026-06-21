@@ -1,28 +1,37 @@
-import React, { useState } from 'react';
+import { Mail, MessageCircle, Phone, QrCode, Copy, CheckCircle2, Loader2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Mail, MessageCircle, Phone, QrCode, Download, Copy, CheckCircle2, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+  buildInvitationUrl,
+  buildWhatsappInvitationLink,
+  normalizeWhatsappPhone,
+} from '@/lib/guestInvitations';
 import { cn } from '@/lib/utils';
 
 export default function GuestInviteModal({ open, onOpenChange, guest, wedding }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(null); // 'email' | 'copied'
 
-  if (!guest || !wedding) return null;
+  if (!guest || !wedding) {
+    return null;
+  }
 
-  const inviteUrl = `${window.location.origin}/invitation?invite=${guest.invitation_link}`;
-  const whatsappText = encodeURIComponent(
-    `✨ *${wedding.title}* ✨\n\nCher(e) ${guest.first_name},\n\nNous avons le plaisir de vous inviter à notre mariage ! 💍\n\n📅 ${wedding.date ? new Date(wedding.date).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : ''}\n📍 ${wedding.venue || ''}\n\n👉 Confirmez votre présence ici :\n${inviteUrl}`
-  );
+  const inviteUrl = buildInvitationUrl(guest.invitation_link);
+  const whatsappPhone = normalizeWhatsappPhone(guest.phone);
+  const whatsappLink = buildWhatsappInvitationLink(guest, wedding);
   const smsText = encodeURIComponent(
     `Invitation mariage ${wedding.title} - ${guest.first_name}, confirmez votre présence : ${inviteUrl}`
   );
 
   const handleSendEmail = async () => {
-    if (!guest.email) return;
+    if (!guest.email) {
+      return;
+    }
+
     setSending(true);
     await base44.integrations.Core.SendEmail({
       to: guest.email,
@@ -54,7 +63,7 @@ export default function GuestInviteModal({ open, onOpenChange, guest, wedding })
 
   const handleCopy = () => {
     if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(inviteUrl).catch(() => {});
+      navigator.clipboard.writeText(inviteUrl).catch(() => undefined);
     } else {
       const textArea = document.createElement("textarea");
       textArea.value = inviteUrl;
@@ -64,9 +73,11 @@ export default function GuestInviteModal({ open, onOpenChange, guest, wedding })
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
-      try { document.execCommand('copy'); } catch (err) {}
+
+      document.execCommand('copy');
       textArea.remove();
     }
+
     setSent('copied');
     setTimeout(() => setSent(null), 2000);
   };
@@ -129,16 +140,16 @@ export default function GuestInviteModal({ open, onOpenChange, guest, wedding })
 
             {/* WhatsApp */}
             <a
-              href={`https://wa.me/${(guest.phone || '').replace(/[^0-9]/g, '')}?text=${whatsappText}`}
+              href={whatsappLink || undefined}
               target="_blank"
               rel="noopener noreferrer"
-              className={cn(!guest.phone && "pointer-events-none opacity-50")}
+              className={cn(!whatsappLink && "pointer-events-none opacity-50")}
             >
-              <Button className="w-full h-12 justify-start gap-3 bg-green-500 hover:bg-green-600 text-white" disabled={!guest.phone}>
+              <Button className="w-full h-12 justify-start gap-3 bg-green-500 hover:bg-green-600 text-white" disabled={!whatsappLink}>
                 <MessageCircle className="w-5 h-5" />
                 <div className="text-left">
                   <div className="font-medium">Envoyer par WhatsApp</div>
-                  <div className="text-xs opacity-70">{guest.phone || 'Aucun téléphone renseigné'}</div>
+                  <div className="text-xs opacity-70">{whatsappPhone || 'Aucun téléphone renseigné'}</div>
                 </div>
               </Button>
             </a>
