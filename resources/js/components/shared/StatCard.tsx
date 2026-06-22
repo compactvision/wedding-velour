@@ -4,16 +4,16 @@ import { cn } from '@/lib/utils';
 
 export default function StatCard({ title, value, subtitle = undefined, icon: Icon = undefined, trend = undefined, className = '' }) {
   return (
-    <Card className={cn("p-5 border border-border/60 bg-card hover:shadow-md transition-shadow", className)}>
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
+    <Card className={cn("border border-border/60 bg-card p-4 transition-shadow hover:shadow-md sm:p-5", className)}>
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">{title}</p>
           <p className="text-2xl font-semibold text-foreground">{value}</p>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+          {subtitle && <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{subtitle}</p>}
         </div>
         {Icon && (
-          <div className="p-2.5 rounded-xl bg-primary/10">
-            <Icon className="w-5 h-5 text-primary" />
+          <div className="rounded-md bg-primary/10 p-2 sm:p-2.5">
+            <Icon className="h-4 w-4 text-primary sm:h-5 sm:w-5" />
           </div>
         )}
       </div>

@@ -1,14 +1,14 @@
-import React from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import {
   LayoutDashboard, Users, UtensilsCrossed, Clock, Camera,
   Bell, TableProperties, ChevronLeft, ChevronRight, LogOut,
   MenuSquare, ShieldCheck, TrendingUp, UserCog,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React from 'react';
 import BrandLogo from '@/components/shared/BrandLogo';
+import { cn } from '@/lib/utils';
 
-const navItems = [
+export const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Tableau de bord', roles: ['admin', 'manager'] },
   { path: '/guests', icon: Users, label: 'Invités', roles: ['admin', 'manager'] },
   { path: '/tables', icon: TableProperties, label: 'Plan de salle', roles: ['admin', 'manager'] },
@@ -28,7 +28,7 @@ export default function Sidebar({ collapsed, onToggle }) {
 
   return (
     <aside className={cn(
-      "fixed left-0 top-0 h-full bg-card border-r border-border z-40 transition-all duration-300 flex flex-col",
+      "fixed left-0 top-0 z-40 hidden h-full flex-col border-r border-border bg-card/95 shadow-sm backdrop-blur-xl transition-all duration-300 md:flex",
       collapsed ? "w-16" : "w-64"
     )}>
       {/* Logo */}

@@ -87,5 +87,15 @@
 
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
   }
 }

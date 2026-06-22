@@ -117,7 +117,7 @@ export default function Dashboard() {
       </PageHeader>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard title="Invités" value={guests.length} subtitle={`${confirmedGuests} confirmés · ${totalCompanions} accompagnants`} icon={Users} />
         <StatCard title="Tables" value={tables.length} subtitle={`${tables.reduce((s, t) => s + (t.capacity || 0), 0)} places`} icon={TableProperties} />
         <StatCard title="Commandes" value={orders.length} subtitle={`${pendingOrders} en attente`} icon={UtensilsCrossed} />
@@ -125,7 +125,7 @@ export default function Dashboard() {
       </div>
 
       {/* Content Grid */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
         {/* Wedding Info */}
         <Card>
           <CardHeader>
@@ -135,21 +135,21 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex justify-between">
+            <div className="flex items-start justify-between gap-4">
               <span className="text-sm text-muted-foreground">Date</span>
-              <span className="text-sm font-medium">
+              <span className="text-right text-sm font-medium">
                 {activeWedding?.date ? format(new Date(activeWedding.date), 'dd MMMM yyyy', { locale: fr }) : '-'}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex items-start justify-between gap-4">
               <span className="text-sm text-muted-foreground">Lieu</span>
-              <span className="text-sm font-medium">{activeWedding?.venue || '-'}</span>
+              <span className="text-right text-sm font-medium">{activeWedding?.venue || '-'}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex items-center justify-between gap-4">
               <span className="text-sm text-muted-foreground">Statut</span>
               <StatusBadge status={activeWedding?.status || 'planning'} />
             </div>
-            <div className="flex justify-between">
+            <div className="flex items-start justify-between gap-4">
               <span className="text-sm text-muted-foreground">Capacité max</span>
               <span className="text-sm font-medium">{activeWedding?.max_guests || 100} invités</span>
             </div>
@@ -170,8 +170,8 @@ export default function Dashboard() {
             ) : (
               <div className="space-y-3">
                 {orders.slice(0, 5).map(order => (
-                  <div key={order.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-                    <div>
+                  <div key={order.id} className="flex items-center justify-between gap-3 border-b border-border/50 py-2 last:border-0">
+                    <div className="min-w-0">
                       <p className="text-sm font-medium">{order.description}</p>
                       <p className="text-xs text-muted-foreground">{order.table_name || 'Table ?'}</p>
                     </div>

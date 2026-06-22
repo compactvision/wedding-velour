@@ -142,10 +142,10 @@ export default function MenuAdmin() {
       </PageHeader>
 
       {/* Category filters */}
-      <div className="flex gap-2 flex-wrap mb-6">
+      <div className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
         <button
           onClick={() => setActiveCategory('all')}
-          className={cn("px-4 py-1.5 rounded-full text-sm font-medium transition-all border", activeCategory === 'all' ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/40")}
+          className={cn("shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-all sm:py-1.5", activeCategory === 'all' ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/40")}
         >
           Tous ({items.length})
         </button>
@@ -154,7 +154,7 @@ export default function MenuAdmin() {
           const Icon = v.icon;
           return (
             <button key={k} onClick={() => setActiveCategory(k)}
-              className={cn("px-4 py-1.5 rounded-full text-sm font-medium transition-all border flex items-center gap-1.5",
+              className={cn("flex shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-all sm:py-1.5",
                 activeCategory === k ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/40")}>
               <Icon className="w-3.5 h-3.5" /> {v.label} ({count})
             </button>

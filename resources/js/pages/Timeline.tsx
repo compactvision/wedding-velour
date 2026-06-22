@@ -117,10 +117,10 @@ export default function Timeline() {
         <EmptyState icon={Clock} title="Aucun événement" description="Planifiez le programme de votre journée" actionLabel="Créer un événement" onAction={() => setShowForm(true)} />
       ) : (
         <div className="relative">
-          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border" />
+          <div className="absolute bottom-0 left-5 top-0 w-0.5 bg-border sm:left-6" />
           <div className="space-y-4">
             {sorted.map((evt, i) => (
-              <div key={evt.id} className="relative flex gap-4 pl-2">
+              <div key={evt.id} className="relative flex gap-3 sm:gap-4 sm:pl-2">
                 <div className={cn(
                   "relative z-10 w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 border-2",
                   evt.status === 'completed' ? 'bg-green-50 border-green-300' :
@@ -129,17 +129,17 @@ export default function Timeline() {
                 )}>
                   {categoryIcons[evt.category] || '📋'}
                 </div>
-                <Card className="flex-1 p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
+                <Card className="min-w-0 flex-1 p-4 transition-shadow hover:shadow-md">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
                         <span className="font-mono text-sm font-semibold text-primary">{evt.time}</span>
                         <StatusBadge status={evt.status} />
                       </div>
                       <h3 className="font-display font-semibold">{evt.title}</h3>
                       {evt.description && <p className="text-sm text-muted-foreground mt-1">{evt.description}</p>}
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex shrink-0 flex-wrap gap-1">
                       {evt.status === 'upcoming' && (
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateMutation.mutate({ id: evt.id, data: { status: 'in_progress' } })}>
                           <Play className="w-3.5 h-3.5 text-primary" />

@@ -286,9 +286,9 @@ export default function Tables() {
 
       {/* View toggle */}
       {tables.length > 0 && (
-        <div className="mb-6">
+        <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <Tabs value={view} onValueChange={(v: any) => setView(v)}>
-            <TabsList>
+            <TabsList className="min-w-max">
               <TabsTrigger value="list" className="gap-2">
                 <List className="w-4 h-4" /> Liste
               </TabsTrigger>
