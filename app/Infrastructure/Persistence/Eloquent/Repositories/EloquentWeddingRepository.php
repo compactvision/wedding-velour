@@ -27,6 +27,7 @@ class EloquentWeddingRepository implements WeddingRepositoryInterface
                 'status'        => $wedding->status,
                 'max_guests'    => $wedding->maxGuests,
                 'notes'         => $wedding->notes,
+                'invitation_custom' => $wedding->invitationCustom,
             ]
         );
     }
@@ -56,6 +57,7 @@ class EloquentWeddingRepository implements WeddingRepositoryInterface
             status: $m->status,
             maxGuests: $m->max_guests,
             notes: $m->notes,
+            invitationCustom: $m->invitation_custom,
         );
     }
 }

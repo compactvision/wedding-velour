@@ -13,6 +13,7 @@ class Wedding
         public ?string $coverImage = null,
         public string $status = 'planning',
         public int $maxGuests = 100,
-        public ?string $notes = null
+        public ?string $notes = null,
+        public ?array $invitationCustom = null
     ) {}
 }

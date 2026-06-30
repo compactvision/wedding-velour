@@ -11,6 +11,9 @@ class WeddingModel extends Model
 
     protected $table = 'weddings';
     protected $guarded = [];
+    protected $casts = [
+        'invitation_custom' => 'array',
+    ];
     public $incrementing = false;
     protected $keyType = 'string';
 }

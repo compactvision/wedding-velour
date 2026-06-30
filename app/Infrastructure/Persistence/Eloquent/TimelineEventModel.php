@@ -11,6 +11,9 @@ class TimelineEventModel extends Model
 
     protected $table = 'timeline_events';
     protected $guarded = [];
+    protected $casts = [
+        'sub_details' => 'array',
+    ];
     public $incrementing = false;
     protected $keyType = 'string';
 }

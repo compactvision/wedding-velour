@@ -2,7 +2,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
   LayoutDashboard, Users, UtensilsCrossed, Clock, Camera,
   Bell, TableProperties, ChevronLeft, ChevronRight, LogOut,
-  MenuSquare, ShieldCheck, TrendingUp, UserCog,
+  MenuSquare, ShieldCheck, TrendingUp, UserCog, MailOpen,
 } from 'lucide-react';
 import React from 'react';
 import BrandLogo from '@/components/shared/BrandLogo';
@@ -15,6 +15,7 @@ export const navItems = [
   { path: '/menu-admin', icon: MenuSquare, label: 'Menu', roles: ['admin', 'manager'] },
   { path: '/orders', icon: UtensilsCrossed, label: 'Commandes', roles: ['admin', 'manager'] },
   { path: '/timeline', icon: Clock, label: 'Programme', roles: ['admin', 'manager'] },
+  { path: '/custom-invitation', icon: MailOpen, label: 'Custom invitation', roles: ['admin', 'manager'] },
   { path: '/photos', icon: Camera, label: 'Galerie', roles: ['admin', 'manager'] },
   { path: '/notifications', icon: Bell, label: 'Notifications', roles: ['admin', 'manager'] },
   { path: '/manager', icon: TrendingUp, label: 'Vue Manager', roles: ['admin', 'manager'] },

@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Clock, Play, CheckCircle2, Trash2, Pencil } from 'lucide-react';
+import { Image, Plus, Clock, Play, CheckCircle2, Trash2, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const categoryIcons = {
@@ -23,15 +23,51 @@ const categoryIcons = {
 };
 
 function EventFormDialog({ open, onOpenChange, event, onSave }) {
-  const [form, setForm] = useState({ title: '', description: '', time: '', category: 'other', notify_all: false });
+  const [form, setForm] = useState({ title: '', description: '', time: '', category: 'other', notify_all: false, image_url: '', sub_details_text: '' });
+  const [uploading, setUploading] = useState(false);
 
   React.useEffect(() => {
     if (event) {
-      setForm({ title: event.title || '', description: event.description || '', time: event.time || '', category: event.category || 'other', notify_all: event.notify_all || false });
+      setForm({
+        title: event.title || '',
+        description: event.description || '',
+        time: event.time || '',
+        category: event.category || 'other',
+        notify_all: event.notify_all || false,
+        image_url: event.image_url || '',
+        sub_details_text: (event.sub_details || []).join('\n'),
+      });
     } else {
-      setForm({ title: '', description: '', time: '', category: 'other', notify_all: false });
+      setForm({ title: '', description: '', time: '', category: 'other', notify_all: false, image_url: '', sub_details_text: '' });
     }
   }, [event, open]);
+
+  const uploadImage = async (file?: File) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await base44.integrations.Core.UploadFile({ file });
+      setForm(prev => ({ ...prev, image_url: result.file_url }));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const submit = () => {
+    const sub_details = form.sub_details_text
+      .split('\n')
+      .map(detail => detail.trim())
+      .filter(Boolean);
+    onSave({
+      title: form.title,
+      description: form.description,
+      time: form.time,
+      category: form.category,
+      notify_all: form.notify_all,
+      image_url: form.image_url || null,
+      sub_details,
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -56,6 +92,35 @@ function EventFormDialog({ open, onOpenChange, event, onSave }) {
             </Select>
           </div>
           <div><Label>Description</Label><Textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} /></div>
+          <div className="space-y-2">
+            <Label>Sous-détails</Label>
+            <Textarea
+              value={form.sub_details_text}
+              onChange={e => setForm({...form, sub_details_text: e.target.value})}
+              placeholder={'Entrée des familles\nRéception des invités\nPhotos officielles'}
+              rows={4}
+            />
+            <p className="text-xs text-muted-foreground">Une ligne par étape interne de ce grand événement.</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Photo de section</Label>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Input value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} placeholder="/storage/uploads/photo.jpg" />
+              <Button type="button" variant="outline" className="relative shrink-0 overflow-hidden" disabled={uploading}>
+                <Image className="mr-2 h-4 w-4" />
+                {uploading ? 'Upload...' : 'Importer'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  onChange={e => uploadImage(e.target.files?.[0])}
+                />
+              </Button>
+            </div>
+            {form.image_url && (
+              <img src={form.image_url} alt="" className="h-32 w-full rounded-lg object-cover" />
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <Switch checked={form.notify_all} onCheckedChange={v => setForm({...form, notify_all: v})} />
             <Label>Notifier tous les invités</Label>
@@ -63,7 +128,7 @@ function EventFormDialog({ open, onOpenChange, event, onSave }) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
-          <Button onClick={() => onSave(form)} disabled={!form.title || !form.time}>Enregistrer</Button>
+          <Button onClick={submit} disabled={!form.title || !form.time}>Enregistrer</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -138,6 +203,18 @@ export default function Timeline() {
                       </div>
                       <h3 className="font-display font-semibold">{evt.title}</h3>
                       {evt.description && <p className="text-sm text-muted-foreground mt-1">{evt.description}</p>}
+                      {evt.sub_details?.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {evt.sub_details.map((detail, index) => (
+                            <span key={`${evt.id}-${index}`} className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                              {detail}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {evt.image_url && (
+                        <img src={evt.image_url} alt="" className="mt-3 aspect-[16/7] w-full rounded-lg object-cover" />
+                      )}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-1">
                       {evt.status === 'upcoming' && (

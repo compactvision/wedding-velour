@@ -30,6 +30,7 @@ Route::middleware(['auth', 'role:manager'])->group(function () {
     Route::get('/menu-admin', fn () => Inertia::render('MenuAdmin'))->name('menu-admin');
     Route::get('/orders', fn () => Inertia::render('Orders'))->name('orders');
     Route::get('/timeline', fn () => Inertia::render('Timeline'))->name('timeline');
+    Route::get('/custom-invitation', fn () => Inertia::render('CustomInvitation'))->name('custom-invitation');
     Route::get('/photos', fn () => Inertia::render('Photos'))->name('photos');
     Route::get('/notifications', fn () => Inertia::render('Notifications'))->name('notifications');
     Route::get('/manager', fn () => Inertia::render('ManagerDashboard'))->name('manager');

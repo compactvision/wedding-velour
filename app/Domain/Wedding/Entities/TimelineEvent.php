@@ -8,8 +8,10 @@ class TimelineEvent
         public readonly ?string $id,
         public readonly string $weddingId,
         public string $title,
-        public ?string $description = null,
         public string $time,
+        public ?string $description = null,
+        public ?string $imageUrl = null,
+        public ?array $subDetails = null,
         public string $category = 'other',
         public string $status = 'upcoming',
         public bool $notifyAll = false
