@@ -21,6 +21,15 @@ import {
 import TableQRModal from '@/components/tables/TableQRModal';
 import { cn } from '@/lib/utils';
 
+const guestSeatCount = (guest: any) => 1 + (Number(guest?.companions) || 0);
+const companionLabel = (guest: any) => {
+  const companions = Number(guest?.companions) || 0;
+
+  return companions > 0
+    ? `${companions} accompagnant${companions > 1 ? 's' : ''}`
+    : 'Sans accompagnant';
+};
+
 // ─── TABLE FORM ─────────────────────────────────────────────────────────────
 function TableFormDialog({ open, onOpenChange, table, onSave }) {
   const [form, setForm] = useState({
@@ -103,6 +112,19 @@ function TableFormDialog({ open, onOpenChange, table, onSave }) {
 function AssignGuestDialog({ open, onOpenChange, table, guests, onAssign }) {
   const [selectedGuest, setSelectedGuest] = useState('');
   const unassigned = guests.filter(g => !g.table_id);
+  const seatedGuests = guests.filter(g => g.table_id === table?.id);
+  const occupiedSeats = seatedGuests.reduce((sum, guest) => sum + guestSeatCount(guest), 0);
+  const capacity = table?.capacity || 8;
+  const remainingSeats = Math.max(0, capacity - occupiedSeats);
+  const selected = unassigned.find(g => g.id === selectedGuest);
+  const selectedSeats = selected ? guestSeatCount(selected) : 0;
+  const selectedFits = !selected || selectedSeats <= remainingSeats;
+
+  React.useEffect(() => {
+    if (open) {
+      setSelectedGuest('');
+    }
+  }, [open, table?.id]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -112,25 +134,49 @@ function AssignGuestDialog({ open, onOpenChange, table, guests, onAssign }) {
             Assigner un invité à {table?.name}
           </DialogTitle>
         </DialogHeader>
+        <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">Places disponibles</span>
+            <span className="font-semibold">{remainingSeats}/{capacity}</span>
+          </div>
+        </div>
         <Select value={selectedGuest} onValueChange={setSelectedGuest}>
           <SelectTrigger><SelectValue placeholder="Sélectionner un invité" /></SelectTrigger>
           <SelectContent>
-            {unassigned.map(g => (
-              <SelectItem key={g.id} value={g.id}>
-                {g.first_name} {g.last_name}
-              </SelectItem>
-            ))}
+            {unassigned.map(g => {
+              const seats = guestSeatCount(g);
+
+              return (
+                <SelectItem key={g.id} value={g.id}>
+                  {g.first_name} {g.last_name} · {seats} place{seats > 1 ? 's' : ''}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
+        {selected && (
+          <div className={cn(
+            'rounded-xl border px-4 py-3 text-sm',
+            selectedFits
+              ? 'border-primary/20 bg-primary/5 text-primary'
+              : 'border-destructive/20 bg-destructive/5 text-destructive'
+          )}>
+            {selected.first_name} {selected.last_name} occupera {selectedSeats} place{selectedSeats > 1 ? 's' : ''}.
+            {' '}{selectedFits
+              ? `${remainingSeats - selectedSeats} place${remainingSeats - selectedSeats > 1 ? 's' : ''} restera${remainingSeats - selectedSeats > 1 ? 'ont' : ''} libre${remainingSeats - selectedSeats > 1 ? 's' : ''}.`
+              : `Il manque ${selectedSeats - remainingSeats} place${selectedSeats - remainingSeats > 1 ? 's' : ''} sur cette table.`}
+          </div>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button
             onClick={() => {
+              if (!selectedFits) return;
               onAssign(selectedGuest, table?.id);
               setSelectedGuest('');
               onOpenChange(false);
             }}
-            disabled={!selectedGuest}
+            disabled={!selectedGuest || !selectedFits}
           >
             Assigner
           </Button>
@@ -256,20 +302,25 @@ export default function Tables() {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const getTableGuests = (tableId: string) => guests.filter((g: any) => g.table_id === tableId);
+  const getTableSeatCount = (tableId: string) =>
+    getTableGuests(tableId).reduce((sum: number, guest: any) => sum + guestSeatCount(guest), 0);
 
   // Enrich tables for floor plan
   const enrichedTables = tables.map((t: any) => ({
     ...t,
-    seated: getTableGuests(t.id).length,
+    seated: getTableSeatCount(t.id),
   }));
 
-  const totalSeated = guests.filter((g: any) => g.table_id).length;
+  const totalSeated = guests
+    .filter((g: any) => g.table_id)
+    .reduce((sum: number, guest: any) => sum + guestSeatCount(guest), 0);
+  const totalSeats = guests.reduce((sum: number, guest: any) => sum + guestSeatCount(guest), 0);
 
   return (
     <div>
       <PageHeader
         title="Plan de salle"
-        subtitle={`${tables.length} tables · ${totalSeated}/${guests.length} invités placés`}
+        subtitle={`${tables.length} tables · ${totalSeated}/${totalSeats} places invitées placées`}
       >
         <WeddingSelector
           weddings={weddings}
@@ -315,7 +366,8 @@ export default function Tables() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {tables.map((table: any) => {
                 const seated = getTableGuests(table.id);
-                const isFull = seated.length >= (table.capacity || 8);
+                const occupiedSeats = getTableSeatCount(table.id);
+                const isFull = occupiedSeats >= (table.capacity || 8);
                 return (
                   <Card
                     key={table.id}
@@ -356,12 +408,12 @@ export default function Tables() {
                     <div className="flex items-center gap-2 mb-3">
                       <Users className="w-4 h-4 text-muted-foreground" />
                       <span className={cn('text-sm font-medium', isFull ? 'text-accent' : 'text-foreground')}>
-                        {seated.length}/{table.capacity || 8}
+                        {occupiedSeats}/{table.capacity || 8} places
                       </span>
                       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
                           className={cn('h-full rounded-full transition-all', isFull ? 'bg-accent' : 'bg-primary')}
-                          style={{ width: `${Math.min(100, (seated.length / (table.capacity || 8)) * 100)}%` }}
+                          style={{ width: `${Math.min(100, (occupiedSeats / (table.capacity || 8)) * 100)}%` }}
                         />
                       </div>
                     </div>
@@ -372,7 +424,12 @@ export default function Tables() {
                           key={g.id}
                           className="flex items-center justify-between text-sm bg-background/60 rounded-md px-2 py-1"
                         >
-                          <span>{g.first_name} {g.last_name}</span>
+                          <span>
+                            {g.first_name} {g.last_name}
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              · {guestSeatCount(g)} place{guestSeatCount(g) > 1 ? 's' : ''} · {companionLabel(g)}
+                            </span>
+                          </span>
                           <button
                             onClick={() => unassignMutation.mutate(g.id)}
                             className="text-xs text-muted-foreground hover:text-destructive"

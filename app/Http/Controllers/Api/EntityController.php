@@ -19,9 +19,12 @@ use App\Domain\Wedding\Repositories\WeddingNotificationRepositoryInterface;
 use App\Domain\Wedding\Repositories\WeddingRepositoryInterface;
 use App\Domain\Wedding\Repositories\WeddingTableRepositoryInterface;
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Persistence\Eloquent\GuestModel;
+use App\Infrastructure\Persistence\Eloquent\WeddingTableModel;
 use App\Infrastructure\Persistence\Eloquent\WeddingNotificationModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use ReflectionClass;
 
 class EntityController extends Controller
@@ -144,6 +147,8 @@ class EntityController extends Controller
             }
         }
 
+        $this->ensureGuestTableCapacity($entityName, $id, $data);
+
         $entity = $this->deserializeEntity($entityClass, $data);
         $repo->save($entity);
 
@@ -193,6 +198,8 @@ class EntityController extends Controller
             );
             $updatedData['wedding_id'] = $request->user()->wedding_id;
         }
+
+        $this->ensureGuestTableCapacity($entityName, $id, $updatedData);
 
         $entity = $this->deserializeEntity($entityClass, $updatedData);
         $repo->save($entity);
@@ -288,6 +295,45 @@ class EntityController extends Controller
         }
 
         return $reflection->newInstanceArgs($args);
+    }
+
+    private function ensureGuestTableCapacity(string $entityName, string $guestId, array $guestData): void
+    {
+        if (strtolower(str_replace(['_', '-'], '', $entityName)) !== 'guest') {
+            return;
+        }
+
+        $tableId = $guestData['table_id'] ?? null;
+        if (! $tableId) {
+            return;
+        }
+
+        $table = WeddingTableModel::query()
+            ->whereKey($tableId)
+            ->where('wedding_id', $guestData['wedding_id'] ?? null)
+            ->first();
+
+        if (! $table) {
+            throw ValidationException::withMessages([
+                'table_id' => 'La table sélectionnée est introuvable pour ce mariage.',
+            ]);
+        }
+
+        $guestSeats = 1 + max(0, (int) ($guestData['companions'] ?? 0));
+        $occupiedSeats = GuestModel::query()
+            ->where('wedding_id', $table->wedding_id)
+            ->where('table_id', $table->id)
+            ->whereKeyNot($guestId)
+            ->get()
+            ->sum(fn (GuestModel $guest) => 1 + max(0, (int) $guest->companions));
+
+        if (($occupiedSeats + $guestSeats) > (int) $table->capacity) {
+            $remainingSeats = max(0, (int) $table->capacity - $occupiedSeats);
+
+            throw ValidationException::withMessages([
+                'table_id' => "Cette table n'a plus assez de places: {$guestSeats} place(s) nécessaires, {$remainingSeats} disponible(s).",
+            ]);
+        }
     }
 
     private function authorizeAccess(Request $request, string $entityName, string $action): void
