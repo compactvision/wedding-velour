@@ -76,6 +76,15 @@ function TableMap({ tables, highlightedTableId, weddingId }) {
   );
 }
 
+const partySize = (guest) => 1 + (Number(guest?.companions) || 0);
+
+const companionText = (guest) => {
+  const count = Number(guest?.companions) || 0;
+  if (count <= 0) return 'Sans accompagnant';
+
+  return `Accompagné de ${count} personne${count > 1 ? 's' : ''}`;
+};
+
 function QrScanner({ onScan }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -203,8 +212,10 @@ export default function DoorAgent() {
     },
   });
 
-  const confirmed = guests.filter(g => g.status === 'confirmed');
-  const total = guests.length;
+  const confirmedPeople = guests
+    .filter(g => g.status === 'confirmed')
+    .reduce((sum, guest) => sum + partySize(guest), 0);
+  const totalPeople = guests.reduce((sum, guest) => sum + partySize(guest), 0);
 
   const handleCheck = (guest) => {
     if (guest.status === 'confirmed') {
@@ -274,9 +285,9 @@ export default function DoorAgent() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Total', value: total, icon: Users, color: 'text-stone-700' },
-            { label: 'Entrés', value: confirmed.length, icon: CheckCircle2, color: 'text-green-600' },
-            { label: 'Attente', value: total - confirmed.length, icon: AlertCircle, color: 'text-amber-600' },
+            { label: 'Total', value: totalPeople, icon: Users, color: 'text-stone-700' },
+            { label: 'Entrés', value: confirmedPeople, icon: CheckCircle2, color: 'text-green-600' },
+            { label: 'Attente', value: totalPeople - confirmedPeople, icon: AlertCircle, color: 'text-amber-600' },
           ].map(({ label, value, icon: Icon, color }) => (
             <Card key={label} className="text-center p-3 border-stone-200 shadow-sm">
               <Icon className={cn("w-5 h-5 mx-auto mb-1", color)} />
@@ -320,6 +331,9 @@ export default function DoorAgent() {
                       <CheckCircle2 className="w-12 h-12 text-primary mx-auto mb-2" />
                       <div className="font-display font-semibold text-2xl text-stone-800">{scanResult.guest.first_name} {scanResult.guest.last_name}</div>
                       <div className="text-sm text-stone-500 bg-stone-100 inline-block px-3 py-1 rounded-full">Invité trouvé</div>
+                      <div className="mx-auto max-w-sm rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
+                        {companionText(scanResult.guest)} · {partySize(scanResult.guest)} personne{partySize(scanResult.guest) > 1 ? 's' : ''} à comptabiliser
+                      </div>
                       <Button className="w-full h-12 mt-4 text-base" onClick={() => confirmEntry(scanResult.guest)}>
                         Valider l'entrée
                       </Button>
@@ -330,6 +344,9 @@ export default function DoorAgent() {
                       <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-2" />
                       <div className="font-display font-semibold text-2xl text-green-700">Bienvenue !</div>
                       <div className="text-stone-700 font-medium text-lg">{scanResult.guest.first_name} {scanResult.guest.last_name}</div>
+                      <div className="mx-auto max-w-sm rounded-xl border border-green-200 bg-white/70 px-4 py-3 text-sm font-medium text-green-800">
+                        {companionText(scanResult.guest)} · entrée de {partySize(scanResult.guest)} personne{partySize(scanResult.guest) > 1 ? 's' : ''} validée
+                      </div>
                       
                       {scanResult.guest.table_id ? (
                         <div className="mt-6 pt-6 border-t border-green-200">
@@ -348,6 +365,9 @@ export default function DoorAgent() {
                       <UserCheck className="w-12 h-12 text-blue-600 mx-auto mb-2" />
                       <div className="font-display font-semibold text-xl text-blue-700">Déjà enregistré</div>
                       <div className="text-stone-600 font-medium">{scanResult.guest.first_name} {scanResult.guest.last_name} est déjà présent.</div>
+                      <div className="mx-auto max-w-sm rounded-xl border border-blue-200 bg-white/70 px-4 py-3 text-sm font-medium text-blue-800">
+                        {companionText(scanResult.guest)} · {partySize(scanResult.guest)} personne{partySize(scanResult.guest) > 1 ? 's' : ''} déjà comptabilisée{partySize(scanResult.guest) > 1 ? 's' : ''}
+                      </div>
                       
                       {scanResult.guest.table_id && (
                         <div className="mt-6 pt-4 border-t border-blue-200">
@@ -396,7 +416,10 @@ export default function DoorAgent() {
                 {filtered.map(g => (
                   <button key={g.id} onClick={() => handleCheck(g)}
                     className="w-full flex items-center justify-between p-4 rounded-xl bg-white border border-stone-200 hover:border-primary/50 hover:bg-stone-50 transition-all text-left shadow-sm">
-                    <span className="font-medium text-stone-800">{g.first_name} {g.last_name}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-stone-800">{g.first_name} {g.last_name}</span>
+                      <span className="block text-xs text-stone-500">{companionText(g)}</span>
+                    </span>
                     <StatusBadge status={g.status} />
                   </button>
                 ))}
@@ -421,7 +444,10 @@ export default function DoorAgent() {
               <div className="divide-y divide-stone-100">
                 {guests.map(g => (
                   <div key={g.id} className="flex items-center justify-between p-4 hover:bg-stone-50 transition-colors">
-                    <span className="text-sm font-medium text-stone-700">{g.first_name} {g.last_name}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-stone-700">{g.first_name} {g.last_name}</span>
+                      <span className="block text-xs text-stone-500">{companionText(g)}</span>
+                    </span>
                     <div className="flex items-center gap-3">
                       <StatusBadge status={g.status} />
                       {g.status !== 'confirmed' && (

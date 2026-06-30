@@ -12,28 +12,83 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Users, UtensilsCrossed, TableProperties, Camera, Clock, Plus, Heart, CalendarDays } from 'lucide-react';
+import { Users, UtensilsCrossed, TableProperties, Camera, Clock, Plus, Heart, CalendarDays, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-function NewWeddingDialog({ open, onOpenChange }) {
+function WeddingFormDialog({ open, onOpenChange, wedding = null }) {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ title: '', date: '', venue: '' });
+  const [form, setForm] = useState({
+    title: '',
+    date: '',
+    venue: '',
+    venue_address: '',
+    max_guests: 100,
+    status: 'planning',
+    notes: '',
+  });
+
+  React.useEffect(() => {
+    if (wedding) {
+      setForm({
+        title: wedding.title || '',
+        date: wedding.date || '',
+        venue: wedding.venue || '',
+        venue_address: wedding.venue_address || '',
+        max_guests: wedding.max_guests || 100,
+        status: wedding.status || 'planning',
+        notes: wedding.notes || '',
+      });
+      return;
+    }
+
+    setForm({
+      title: '',
+      date: '',
+      venue: '',
+      venue_address: '',
+      max_guests: 100,
+      status: 'planning',
+      notes: '',
+    });
+  }, [wedding, open]);
   
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Wedding.create(data),
+    mutationFn: (data) => base44.entities.Wedding.create({
+      ...data,
+      max_guests: Number(data.max_guests) || 0,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['weddings'] });
       onOpenChange(false);
-      setForm({ title: '', date: '', venue: '' });
     }
   });
+
+  const updateMutation = useMutation({
+    mutationFn: (data) => base44.entities.Wedding.update(wedding.id, {
+      ...data,
+      max_guests: Number(data.max_guests) || 0,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['weddings'] });
+      onOpenChange(false);
+    }
+  });
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+  const save = () => {
+    if (wedding) {
+      updateMutation.mutate(form);
+    } else {
+      createMutation.mutate(form);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="font-display">Nouveau Mariage</DialogTitle>
+          <DialogTitle className="font-display">{wedding ? 'Modifier le mariage' : 'Nouveau Mariage'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -48,11 +103,29 @@ function NewWeddingDialog({ open, onOpenChange }) {
             <Label>Lieu</Label>
             <Input value={form.venue} onChange={e => setForm({...form, venue: e.target.value})} placeholder="Château de..." />
           </div>
+          <div>
+            <Label>Adresse</Label>
+            <Input value={form.venue_address} onChange={e => setForm({...form, venue_address: e.target.value})} placeholder="Adresse complète du lieu" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Capacité</Label>
+              <Input type="number" min={0} value={form.max_guests} onChange={e => setForm({...form, max_guests: e.target.value})} />
+            </div>
+            <div>
+              <Label>Statut</Label>
+              <Input value={form.status} onChange={e => setForm({...form, status: e.target.value})} placeholder="planning" />
+            </div>
+          </div>
+          <div>
+            <Label>Notes</Label>
+            <Input value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} placeholder="Informations internes" />
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
-          <Button onClick={() => createMutation.mutate(form)} disabled={!form.title || !form.date}>
-            Créer
+          <Button onClick={save} disabled={!form.title || !form.date || isSaving}>
+            {wedding ? 'Enregistrer' : 'Créer'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -63,6 +136,7 @@ function NewWeddingDialog({ open, onOpenChange }) {
 export default function Dashboard() {
   const { weddings, activeWedding, activeWeddingId, setActiveWeddingId, isLoading } = useActiveWedding();
   const [showNewWedding, setShowNewWedding] = useState(false);
+  const [showEditWedding, setShowEditWedding] = useState(false);
 
   const { data: guests = [] } = useQuery({
     queryKey: ['guests', activeWeddingId],
@@ -88,7 +162,11 @@ export default function Dashboard() {
     enabled: !!activeWeddingId,
   });
 
-  const confirmedGuests = guests.filter(g => g.status === 'confirmed').length;
+  const partySize = (guest) => 1 + (Number(guest.companions) || 0);
+  const invitedPeople = guests.reduce((sum, guest) => sum + partySize(guest), 0);
+  const confirmedGuests = guests
+    .filter(g => g.status === 'confirmed')
+    .reduce((sum, guest) => sum + partySize(guest), 0);
   const pendingOrders = orders.filter(o => o.status === 'pending').length;
   const totalCompanions = guests.reduce((sum, g) => sum + (g.companions || 0), 0);
 
@@ -102,7 +180,7 @@ export default function Dashboard() {
           actionLabel="Créer un mariage"
           onAction={() => setShowNewWedding(true)}
         />
-        <NewWeddingDialog open={showNewWedding} onOpenChange={setShowNewWedding} />
+        <WeddingFormDialog open={showNewWedding} onOpenChange={setShowNewWedding} />
       </div>
     );
   }
@@ -118,7 +196,7 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard title="Invités" value={guests.length} subtitle={`${confirmedGuests} confirmés · ${totalCompanions} accompagnants`} icon={Users} />
+        <StatCard title="Invités" value={invitedPeople} subtitle={`${guests.length} fiches · ${confirmedGuests} présents · ${totalCompanions} accompagnants`} icon={Users} />
         <StatCard title="Tables" value={tables.length} subtitle={`${tables.reduce((s, t) => s + (t.capacity || 0), 0)} places`} icon={TableProperties} />
         <StatCard title="Commandes" value={orders.length} subtitle={`${pendingOrders} en attente`} icon={UtensilsCrossed} />
         <StatCard title="Programme" value={timeline.length} subtitle="événements planifiés" icon={Clock} />
@@ -133,6 +211,10 @@ export default function Dashboard() {
               <CalendarDays className="w-5 h-5 text-primary" />
               Informations
             </CardTitle>
+            <Button variant="outline" size="sm" onClick={() => setShowEditWedding(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Modifier
+            </Button>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-start justify-between gap-4">
@@ -145,14 +227,24 @@ export default function Dashboard() {
               <span className="text-sm text-muted-foreground">Lieu</span>
               <span className="text-right text-sm font-medium">{activeWedding?.venue || '-'}</span>
             </div>
+            <div className="flex items-start justify-between gap-4">
+              <span className="text-sm text-muted-foreground">Adresse</span>
+              <span className="text-right text-sm font-medium">{activeWedding?.venue_address || '-'}</span>
+            </div>
             <div className="flex items-center justify-between gap-4">
               <span className="text-sm text-muted-foreground">Statut</span>
               <StatusBadge status={activeWedding?.status || 'planning'} />
             </div>
             <div className="flex items-start justify-between gap-4">
               <span className="text-sm text-muted-foreground">Capacité max</span>
-              <span className="text-sm font-medium">{activeWedding?.max_guests || 100} invités</span>
+              <span className="text-sm font-medium">{activeWedding?.max_guests || 100} personnes</span>
             </div>
+            {activeWedding?.notes && (
+              <div className="flex items-start justify-between gap-4">
+                <span className="text-sm text-muted-foreground">Notes</span>
+                <span className="text-right text-sm font-medium">{activeWedding.notes}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -194,8 +286,10 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-3">
               {['confirmed', 'invited', 'declined', 'absent'].map(status => {
-                const count = guests.filter(g => g.status === status).length;
-                const pct = guests.length > 0 ? Math.round((count / guests.length) * 100) : 0;
+                const count = guests
+                  .filter(g => g.status === status)
+                  .reduce((sum, guest) => sum + partySize(guest), 0);
+                const pct = invitedPeople > 0 ? Math.round((count / invitedPeople) * 100) : 0;
                 return (
                   <div key={status}>
                     <div className="flex justify-between text-sm mb-1">
@@ -243,7 +337,8 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <NewWeddingDialog open={showNewWedding} onOpenChange={setShowNewWedding} />
+      <WeddingFormDialog open={showNewWedding} onOpenChange={setShowNewWedding} />
+      <WeddingFormDialog open={showEditWedding} onOpenChange={setShowEditWedding} wedding={activeWedding} />
     </div>
   );
 }

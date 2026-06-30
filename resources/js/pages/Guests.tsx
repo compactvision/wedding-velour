@@ -88,10 +88,15 @@ export default function Guests() {
   const whatsappRecipientCount = activeWedding
     ? guests.filter(guest => buildWhatsappInvitationLink(guest, activeWedding)).length
     : 0;
+  const partySize = (guest) => 1 + (Number(guest.companions) || 0);
+  const invitedPeople = guests.reduce((sum, guest) => sum + partySize(guest), 0);
+  const confirmedPeople = guests
+    .filter(g => g.status === 'confirmed')
+    .reduce((sum, guest) => sum + partySize(guest), 0);
 
   return (
     <div>
-      <PageHeader title="Invités" subtitle={`${guests.length} invités · ${guests.filter(g => g.status === 'confirmed').length} confirmés`}>
+      <PageHeader title="Invités" subtitle={`${invitedPeople} personnes · ${guests.length} fiches · ${confirmedPeople} confirmées`}>
         <WeddingSelector weddings={weddings} activeWeddingId={activeWeddingId} onSelect={setActiveWeddingId} />
         <Button
           variant="outline"
@@ -140,7 +145,7 @@ export default function Guests() {
                   <th className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4">Nom</th>
                   <th className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4">Rôle</th>
                   <th className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4">Statut</th>
-                  <th className="text-center text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4">+1</th>
+                  <th className="text-center text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4">Accompagnants</th>
                   <th className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4">Tél.</th>
                   <th className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4 w-12"></th>
                 </tr>

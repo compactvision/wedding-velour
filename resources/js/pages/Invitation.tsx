@@ -158,6 +158,13 @@ export default function Invitation() {
   const custom = { ...DEFAULT_INVITATION, ...(wedding.invitation_custom || {}) };
   const accentColor = custom.accent_color || DEFAULT_INVITATION.accent_color;
   const guestName = `${guest.first_name} ${guest.last_name}`;
+  const companionCount = Number(guest.companions) || 0;
+  const partySize = 1 + companionCount;
+  const hasCompanions = companionCount > 0;
+  const companionLine = hasCompanions
+    ? `Votre invitation est prévue pour vous et ${companionCount} personne${companionCount > 1 ? 's' : ''} qui vous accompagne${companionCount > 1 ? 'nt' : ''}.`
+    : '';
+  const partyLabel = `${partySize} personne${partySize > 1 ? 's' : ''}`;
   const invitationTitle = custom.title || wedding.title;
   const formattedWeddingDate = format(new Date(wedding.date), 'EEEE d MMMM yyyy', { locale: fr });
   const greetingParts = custom.greeting.includes('{guest}')
@@ -223,6 +230,11 @@ export default function Invitation() {
       context.fillText(invitationTitle, canvas.width / 2, 55);
       context.font = '500 24px sans-serif';
       context.fillText(`${guest.first_name} ${guest.last_name}`, canvas.width / 2, 95);
+      if (hasCompanions) {
+        context.font = '600 18px sans-serif';
+        context.fillStyle = accentColor;
+        context.fillText(`Pass valable pour ${partyLabel}`, canvas.width / 2, 122);
+      }
       context.drawImage(image, 110, 130, 500, 500);
       context.font = '500 20px monospace';
       context.fillText(`Référence : ${inviteToken}`, canvas.width / 2, 690);
@@ -372,7 +384,35 @@ export default function Invitation() {
     ctx.fillStyle = '#57534e';
     ctx.font = '300 32px sans-serif';
     currentY = drawWrappedText(ctx, custom.body, 540, currentY, 740, 52);
-    currentY += 120;
+    currentY += 80;
+
+    if (hasCompanions) {
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = 'rgba(0,0,0,0.08)';
+      ctx.shadowBlur = 24;
+      ctx.shadowOffsetY = 12;
+      ctx.beginPath();
+      ctx.roundRect(180, currentY, 720, 116, 58);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.strokeStyle = `${accentColor}55`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(190, currentY + 10, 700, 96, 48);
+      ctx.stroke();
+
+      ctx.fillStyle = accentColor;
+      ctx.font = '700 22px sans-serif';
+      ctx.fillText('INVITATION ACCOMPAGNÉE', 540, currentY + 42);
+      ctx.fillStyle = '#57534e';
+      ctx.font = '400 24px sans-serif';
+      ctx.fillText(`Ce carton est réservé pour ${partyLabel}.`, 540, currentY + 78);
+      currentY += 170;
+    } else {
+      currentY += 40;
+    }
 
     // QR Code Box
     const qrImage = await loadCanvasImage(`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(svg))))}`);
@@ -467,6 +507,12 @@ export default function Invitation() {
                 <h1 className="mt-4 md:mt-6 font-display text-4xl font-medium leading-[1.1] text-stone-800 md:text-6xl drop-shadow-sm">
                   {invitationTitle}
                 </h1>
+                {hasCompanions && (
+                  <div className="mx-auto mt-5 md:mt-7 inline-flex items-center gap-2 rounded-full border border-stone-200/80 bg-white/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 shadow-sm backdrop-blur md:px-5 md:py-2.5 md:text-[11px]">
+                    <Users className="h-3.5 w-3.5" style={{ color: accentColor }} />
+                    {partyLabel} attendues
+                  </div>
+                )}
                 <div className="mx-auto mt-6 md:mt-8 h-[1px] w-16 md:w-24 bg-gradient-to-r from-transparent via-stone-400 to-transparent" />
                 
                 <p className="mt-6 md:mt-8 text-[11px] md:text-sm font-bold uppercase tracking-[0.2em] md:tracking-[0.3em] text-stone-600">
@@ -635,6 +681,30 @@ export default function Invitation() {
                 <p className="text-stone-500 leading-relaxed md:leading-loose text-sm sm:text-base md:text-lg font-light">
                   {custom.body}
                 </p>
+                {hasCompanions && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 18 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.8, delay: 0.1 }}
+                    className="mx-auto mt-8 max-w-2xl overflow-hidden rounded-[1.75rem] border border-stone-100 bg-gradient-to-br from-white via-stone-50/80 to-white p-1 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.28)] md:mt-10"
+                  >
+                    <div className="relative rounded-[1.45rem] px-6 py-6 md:px-10 md:py-7">
+                      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                      <div className="mb-4 flex items-center justify-center gap-3">
+                        <span className="h-px w-10 bg-stone-200" />
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-stone-100" style={{ color: accentColor }}>
+                          <Users className="h-5 w-5" />
+                        </span>
+                        <span className="h-px w-10 bg-stone-200" />
+                      </div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-stone-400">Votre douce compagnie</p>
+                      <p className="mt-3 text-sm font-light leading-relaxed text-stone-600 md:text-base">
+                        {companionLine} Nous avons préparé votre accueil pour <span className="font-semibold" style={{ color: accentColor }}>{partyLabel}</span>.
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
               </motion.div>
 
               {/* RSVP Form */}
@@ -679,6 +749,7 @@ export default function Invitation() {
                 {!isAttending && !isDeclined && (
                   <p className="mx-auto mt-6 md:mt-8 max-w-md text-xs md:text-sm text-stone-400 font-light leading-relaxed">
                     Le programme, votre table et votre code d’accès apparaîtront dès que votre présence sera confirmée.
+                    {hasCompanions ? ` Cette réponse comptera pour ${partyLabel}.` : ''}
                   </p>
                 )}
                 {isDeclined && (
@@ -801,6 +872,12 @@ export default function Invitation() {
                 <p className="mx-auto mt-4 md:mt-6 max-w-xl text-sm md:text-base text-stone-500 font-light leading-relaxed">
                   Ce QR code est votre invitation personnelle. Présentez-le à l’entrée pour accéder aux festivités.
                 </p>
+                {hasCompanions && (
+                  <div className="mx-auto mt-6 flex max-w-md items-center justify-center gap-3 rounded-2xl border border-primary/10 bg-white/75 px-5 py-4 text-sm font-medium text-stone-600 shadow-sm">
+                    <Users className="h-5 w-5 shrink-0 text-primary" />
+                    <span>Ce pass couvre votre arrivée en groupe: {partyLabel} au total.</span>
+                  </div>
+                )}
                 <div id="guest-invitation-qr" className="mx-auto mt-8 md:mt-12 w-fit rounded-[1.5rem] md:rounded-[2.5rem] bg-white p-5 md:p-8 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.1)] transition-transform hover:scale-105 duration-500">
                   <QRCodeSVG value={invitationUrl} size={220} level="H" includeMargin />
                 </div>
