@@ -3,6 +3,7 @@ import React from 'react';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const roleLabels = {
   guest: 'Invité',
@@ -14,7 +15,7 @@ const roleLabels = {
   vip: 'VIP',
 };
 
-export default function GuestRow({ guest, onEdit, onDelete, onStatusChange, onShowQR = null, onInvite = null }) {
+export default function GuestRow({ guest, preferences = [], onEdit, onDelete, onStatusChange, onShowQR = null, onInvite = null }) {
   const handleInvite = onInvite || onShowQR;
 
   return (
@@ -28,6 +29,38 @@ export default function GuestRow({ guest, onEdit, onDelete, onStatusChange, onSh
       <td className="py-3 px-4 text-sm text-muted-foreground">{roleLabels[guest.role] || guest.role}</td>
       <td className="py-3 px-4"><StatusBadge status={guest.status} /></td>
       <td className="py-3 px-4 text-sm text-center">{guest.companions || 0}</td>
+      <td className="max-w-[240px] py-3 px-4 text-sm text-muted-foreground">
+        {preferences.length > 0 ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" className="flex max-w-full flex-wrap gap-1.5 text-left">
+                {preferences.slice(0, 2).map((preference) => (
+                  <span key={preference} className="max-w-[110px] truncate rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                    {preference}
+                  </span>
+                ))}
+                {preferences.length > 2 && (
+                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                    +{preferences.length - 2}
+                  </span>
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="start" className="max-w-xs bg-stone-950 p-3 text-left text-white">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/60">Goûts enregistrés</p>
+              <div className="flex flex-wrap gap-1.5">
+                {preferences.map((preference) => (
+                  <span key={preference} className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white">
+                    {preference}
+                  </span>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className="text-xs">Non renseigné</span>
+        )}
+      </td>
       <td className="py-3 px-4 text-sm text-muted-foreground">{guest.phone || '-'}</td>
       <td className="py-3 px-4">
         <div className="flex items-center gap-1">

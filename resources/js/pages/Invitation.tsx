@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { Heart, MapPin, CalendarDays, Clock, GlassWater, Utensils, CheckCircle2, XCircle, Users, MailOpen, ChefHat, Check, Sparkles, Download, QrCode, Flower2, Leaf } from 'lucide-react';
+import { Heart, MapPin, CalendarDays, Clock, GlassWater, Utensils, CheckCircle2, XCircle, Users, Check, Sparkles, Download, QrCode, Flower2, Leaf } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -87,6 +87,7 @@ export default function Invitation() {
   const [menuPreferences, setMenuPreferences] = useState<string[]>([]);
   const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
@@ -123,13 +124,38 @@ export default function Invitation() {
         status,
         menu_preferences: menuPreferences,
       });
-      setGuest(updatedGuest);
+      setGuest({ ...guest, ...updatedGuest, status, menu_preferences: menuPreferences });
       setSavedSuccess(true);
+      if (status === 'attending' || status === 'confirmed') {
+        setTimeout(() => {
+          downloadInvitationCard();
+        }, 650);
+      }
       setTimeout(() => setSavedSuccess(false), 3000);
     } catch (e) {
       console.error(e);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    if (!inviteToken || !guest) return;
+
+    setIsSavingPreferences(true);
+    try {
+      const updatedGuest = await base44.public.respondToInvitation(inviteToken, {
+        status: guest.status === 'declined' ? 'confirmed' : (guest.status || 'confirmed'),
+        menu_preferences: menuPreferences,
+      });
+      setGuest({ ...guest, ...updatedGuest, menu_preferences: menuPreferences });
+      setSavedSuccess(true);
+      setIsMenuModalOpen(false);
+      setTimeout(() => setSavedSuccess(false), 3000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingPreferences(false);
     }
   };
 
@@ -170,6 +196,9 @@ export default function Invitation() {
   const greetingParts = custom.greeting.includes('{guest}')
     ? custom.greeting.split('{guest}')
     : [custom.greeting ? `${custom.greeting} ` : '', ''];
+  const selectedPreferredItems = menuPreferences
+    .map(id => menuItems.find(item => item.id === id))
+    .filter(Boolean);
 
   const toggleMenuPreference = (itemId: string) => {
     setMenuPreferences(prev => {
@@ -252,7 +281,7 @@ export default function Invitation() {
   const downloadInvitationCard = async () => {
     const canvas = document.createElement('canvas');
     canvas.width = 1080;
-    canvas.height = 2600; 
+    canvas.height = 2800 + (timeline.length * 460) + (custom.background_image ? 650 : 0);
     const ctx = canvas.getContext('2d');
     const svg = document.querySelector('#guest-invitation-qr svg');
     if (!ctx || !svg) return;
@@ -414,6 +443,83 @@ export default function Invitation() {
       currentY += 40;
     }
 
+    if (timeline.length > 0) {
+      ctx.fillStyle = accentColor;
+      ctx.font = '600 22px sans-serif';
+      ctx.fillText('PROGRAMME', 540, currentY);
+      currentY += 62;
+
+      ctx.strokeStyle = '#e7e5e4';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(210, currentY - 20);
+      ctx.lineTo(870, currentY - 20);
+      ctx.stroke();
+
+      for (const event of timeline) {
+        const eventStartY = currentY;
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = 'rgba(0,0,0,0.07)';
+        ctx.shadowBlur = 22;
+        ctx.shadowOffsetY = 10;
+        ctx.beginPath();
+        ctx.roundRect(150, currentY, 780, event.image_url ? 300 : 190, 34);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.fillStyle = accentColor;
+        ctx.font = '700 24px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(event.time?.substring(0, 5) || '', 200, currentY + 58);
+
+        ctx.fillStyle = '#292524';
+        ctx.font = '500 34px serif';
+        ctx.fillText(event.title || 'Moment de la célébration', 320, currentY + 58);
+
+        ctx.fillStyle = '#78716c';
+        ctx.font = '24px sans-serif';
+        if (event.description) {
+          drawWrappedText(ctx, event.description, 320, currentY + 100, 540, 38);
+        }
+
+        if (event.image_url) {
+          try {
+            const eventImage = await loadCanvasImage(event.image_url);
+            const imageW = 260;
+            const imageH = 150;
+            const imageX = 320;
+            const imageY = currentY + 132;
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(imageX, imageY, imageW, imageH, 24);
+            ctx.clip();
+            const scale = Math.max(imageW / eventImage.width, imageH / eventImage.height);
+            const imgW = eventImage.width * scale;
+            const imgH = eventImage.height * scale;
+            ctx.drawImage(eventImage, imageX + imageW / 2 - imgW / 2, imageY + imageH / 2 - imgH / 2, imgW, imgH);
+            ctx.restore();
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
+        if (event.sub_details?.length > 0) {
+          ctx.fillStyle = '#57534e';
+          ctx.font = '600 20px sans-serif';
+          const detailY = event.image_url ? eventStartY + 230 : eventStartY + 145;
+          event.sub_details.slice(0, 3).forEach((detail, index) => {
+            ctx.fillText(`- ${detail}`, 610, detailY + index * 30);
+          });
+        }
+
+        ctx.textAlign = 'center';
+        currentY += event.image_url ? 340 : 230;
+      }
+
+      currentY += 45;
+    }
+
     // QR Code Box
     const qrImage = await loadCanvasImage(`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(svg))))}`);
     const qrSize = 300;
@@ -530,7 +636,7 @@ export default function Invitation() {
                     <Heart className="h-6 w-6 md:h-8 md:w-8 text-white/90 drop-shadow-md" fill="currentColor" />
                   </div>
                   <p className="mt-5 md:mt-6 text-[10px] md:text-[11px] uppercase tracking-[0.3em] text-stone-400 font-bold group-hover:text-stone-700 transition-colors">
-                    Briser le sceau
+                    Cliquer ici pour ouvrir l'invitation
                   </p>
                 </div>
 
@@ -720,7 +826,7 @@ export default function Invitation() {
                 <Label className="mb-6 md:mb-10 block text-center text-xs md:text-sm font-bold uppercase tracking-widest text-stone-400">{custom.rsvp_question}</Label>
                 <div className="flex flex-col gap-4 sm:flex-row sm:gap-6 px-2 md:px-8">
                   <Button
-                    onClick={() => handleRSVP('attending')}
+                    onClick={() => handleRSVP('confirmed')}
                     disabled={isSubmitting}
                     className={cn(
                       "flex-1 h-14 md:h-20 rounded-xl md:rounded-[1.5rem] text-sm md:text-lg font-medium transition-all duration-500 relative overflow-hidden",
@@ -905,46 +1011,46 @@ export default function Invitation() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 1 }}
-                className="bg-white rounded-[2rem] md:rounded-[3rem] p-6 sm:p-8 md:p-16 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.1)] border border-stone-100 relative overflow-hidden max-w-5xl mx-auto"
+                className="bg-white rounded-[1.5rem] md:rounded-[3rem] p-5 sm:p-8 md:p-16 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.1)] border border-stone-100 relative overflow-hidden max-w-5xl mx-auto"
               >
                 <div className="absolute top-0 left-0 w-1.5 md:w-2 h-full" style={{ background: `linear-gradient(180deg, ${accentColor}, ${accentColor}20)` }} />
                 
-                <div className="flex items-center gap-4 md:gap-6 mb-8 md:mb-10">
-                  <div className="w-10 h-10 md:w-16 md:h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                <div className="flex items-center gap-3 md:gap-6 mb-6 md:mb-10">
+                  <div className="w-10 h-10 md:w-16 md:h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary shadow-inner shrink-0">
                     <GlassWater className="w-5 h-5 md:w-8 md:h-8" />
                   </div>
-                  <h3 className="font-display text-2xl md:text-4xl text-stone-800">
-                    Préférences Culinaires
+                  <h3 className="font-display text-2xl leading-tight md:text-4xl text-stone-800">
+                    Préférences boissons
                   </h3>
                 </div>
 
-                <div className="space-y-6 md:space-y-10 pl-2 md:pl-4">
+                <div className="space-y-5 md:space-y-10 md:pl-4">
                   <div className="space-y-4 md:space-y-6">
-                    <p className="text-sm md:text-base text-stone-500 font-light leading-relaxed max-w-2xl">Aidez-nous à composer le menu parfait en choisissant vos plats favoris (jusqu'à 5).</p>
+                    <p className="text-sm md:text-base text-stone-500 font-light leading-relaxed max-w-2xl">Aidez-nous à préparer votre service en choisissant vos boissons favorites (jusqu'à 5).</p>
                     
                     <Dialog open={isMenuModalOpen} onOpenChange={setIsMenuModalOpen}>
                       <DialogTrigger asChild>
                         <button className={cn(
-                          "w-full h-16 md:h-24 flex items-center gap-4 md:gap-6 px-5 md:px-8 rounded-xl md:rounded-[2rem] border-2 transition-all duration-300 group text-left",
+                          "w-full min-h-16 md:min-h-24 flex items-center gap-3 md:gap-6 px-4 py-4 md:px-8 md:py-5 rounded-xl md:rounded-[2rem] border-2 transition-all duration-300 group text-left",
                           menuPreferences.length > 0
                             ? "border-primary/40 bg-primary/5 hover:bg-primary/10 shadow-md hover:shadow-lg"
                             : "border-stone-200 bg-stone-50 hover:border-stone-300 hover:bg-white shadow-sm hover:shadow-md"
                         )}>
                           <div className={cn("w-10 h-10 md:w-14 md:h-14 rounded-full flex items-center justify-center shrink-0 transition-colors shadow-sm", menuPreferences.length > 0 ? "bg-primary text-white" : "bg-white text-stone-400 group-hover:text-stone-600")}>
-                            <ChefHat className="w-5 h-5 md:w-7 md:h-7" />
+                            <GlassWater className="w-5 h-5 md:w-7 md:h-7" />
                           </div>
                           <div className="flex-1 min-w-0">
                             {menuPreferences.length > 0 ? (
                               <div>
                                 <span className="font-bold text-primary text-sm md:text-lg block mb-0.5 md:mb-1">
-                                  {menuPreferences.length} plat{menuPreferences.length > 1 ? 's' : ''} sélectionné{menuPreferences.length > 1 ? 's' : ''}
+                                  {menuPreferences.length} choix sélectionné{menuPreferences.length > 1 ? 's' : ''}
                                 </span>
                                 <span className="text-[10px] md:text-xs text-primary/70 font-medium tracking-wide uppercase">Cliquez pour modifier vos choix</span>
                               </div>
                             ) : (
                               <div>
-                                <span className="text-stone-700 font-bold text-sm md:text-lg block mb-0.5 md:mb-1">Découvrir le menu</span>
-                                <span className="text-[10px] md:text-xs text-stone-500 font-light">Choisir vos préférences culinaires</span>
+                                <span className="text-stone-700 font-bold text-sm md:text-lg block mb-0.5 md:mb-1">Découvrir les boissons</span>
+                                <span className="text-[10px] md:text-xs text-stone-500 font-light">Choisir vos préférences boissons</span>
                               </div>
                             )}
                           </div>
@@ -954,23 +1060,23 @@ export default function Invitation() {
                         </button>
                       </DialogTrigger>
 
-                      <DialogContent className="max-w-4xl bg-stone-50 border-0 shadow-2xl p-0 overflow-hidden rounded-[2rem] md:rounded-[3rem] max-h-[90vh] flex flex-col w-[95vw] md:w-full">
+                          <DialogContent className="max-w-4xl bg-stone-50 border-0 shadow-2xl p-0 overflow-hidden rounded-[1.5rem] md:rounded-[3rem] max-h-[92dvh] flex flex-col w-[calc(100vw-1rem)] md:w-full">
                         {/* Header */}
-                        <div className="p-6 md:p-12 border-b border-stone-100 bg-white relative shrink-0">
+                        <div className="p-5 md:p-12 border-b border-stone-100 bg-white relative shrink-0">
                           <div className="absolute top-0 right-0 w-32 h-32 md:w-64 md:h-64 bg-primary/5 rounded-bl-full pointer-events-none" />
-                          <div className="flex items-start gap-4 md:gap-6">
-                            <div className="w-12 h-12 md:w-20 md:h-20 rounded-2xl md:rounded-[2rem] bg-primary/10 flex items-center justify-center shrink-0 shadow-inner">
-                              <ChefHat className="w-6 h-6 md:w-10 md:h-10 text-primary" />
+                          <div className="flex items-start gap-3 md:gap-6">
+                            <div className="w-11 h-11 md:w-20 md:h-20 rounded-2xl md:rounded-[2rem] bg-primary/10 flex items-center justify-center shrink-0 shadow-inner">
+                              <GlassWater className="w-6 h-6 md:w-10 md:h-10 text-primary" />
                             </div>
-                            <div>
-                              <DialogTitle className="font-display text-2xl md:text-4xl text-stone-800">Notre Carte</DialogTitle>
+                            <div className="min-w-0">
+                              <DialogTitle className="font-display text-2xl leading-tight md:text-4xl text-stone-800">Carte des boissons</DialogTitle>
                               <DialogDescription className="text-stone-500 mt-2 md:mt-3 text-sm md:text-base font-light">
                                 Choisissez vos favoris parmi nos propositions
                               </DialogDescription>
                             </div>
                           </div>
                           {/* Progress bar */}
-                          <div className="mt-6 md:mt-10">
+                          <div className="mt-5 md:mt-10">
                             <div className="flex items-center justify-between mb-3 md:mb-4">
                               <span className="text-xs md:text-sm text-stone-500 font-bold uppercase tracking-widest">Mes sélections</span>
                               <span className={cn("text-xs md:text-sm font-bold", menuPreferences.length >= MAX_PREFERENCES ? "text-primary" : "text-stone-600")}>
@@ -994,7 +1100,7 @@ export default function Invitation() {
                         </div>
 
                         {/* Scrollable content grouped by category */}
-                        <div className="flex-1 overflow-y-auto p-5 md:p-12 space-y-10 md:space-y-16">
+                        <div className="flex-1 overflow-y-auto p-4 md:p-12 space-y-8 md:space-y-16">
                           {menuItems.length === 0 ? (
                             <div className="text-center py-12 md:py-24">
                               <Utensils className="w-12 h-12 md:w-20 md:h-20 text-stone-200 mx-auto mb-4 md:mb-8" />
@@ -1012,9 +1118,9 @@ export default function Invitation() {
                               const catMeta = CATEGORY_LABELS[category] || { label: category, emoji: '🍴' };
                               return (
                                 <div key={category}>
-                                  <div className="flex items-center gap-3 md:gap-5 mb-5 md:mb-8">
+                                  <div className="flex items-center gap-3 md:gap-5 mb-4 md:mb-8">
                                     <span className="text-xl md:text-3xl">{catMeta.emoji}</span>
-                                    <h4 className="font-display text-xl md:text-3xl text-stone-700">{catMeta.label}</h4>
+                                    <h4 className="font-display text-xl leading-tight md:text-3xl text-stone-700">{catMeta.label}</h4>
                                     <div className="flex-1 h-[2px] bg-stone-100" />
                                   </div>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
@@ -1029,7 +1135,7 @@ export default function Invitation() {
                                           whileTap={!isDisabled ? { scale: 0.98 } : {}}
                                           onClick={() => (!isDisabled || isSelected) ? toggleMenuPreference(item.id) : undefined}
                                           className={cn(
-                                            "relative w-full p-4 md:p-6 rounded-xl md:rounded-[2rem] border-2 transition-all duration-300 text-left flex items-start gap-3 md:gap-5 group",
+                                            "relative w-full p-3.5 md:p-6 rounded-xl md:rounded-[2rem] border-2 transition-all duration-300 text-left flex items-start gap-3 md:gap-5 group",
                                             isSelected
                                               ? "border-primary bg-primary/5 shadow-[0_10px_20px_rgba(0,0,0,0.05)]"
                                               : isDisabled
@@ -1038,12 +1144,12 @@ export default function Invitation() {
                                           )}
                                         >
                                           <div className={cn(
-                                            "w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl flex items-center justify-center text-xl md:text-3xl shrink-0 transition-all duration-300 shadow-sm",
+                                            "w-11 h-11 md:w-16 md:h-16 rounded-xl md:rounded-2xl flex items-center justify-center text-xl md:text-3xl shrink-0 transition-all duration-300 shadow-sm",
                                             isSelected ? "bg-white scale-110" : "bg-stone-50 group-hover:bg-white group-hover:scale-105"
                                           )}>
                                             {item.emoji || '🍽️'}
                                           </div>
-                                          <div className="flex-1 min-w-0 pr-6 md:pr-10">
+                                          <div className="flex-1 min-w-0 pr-7 md:pr-10">
                                             <p className={cn("font-bold text-sm md:text-lg leading-tight mb-1 md:mb-2", isSelected ? "text-primary" : "text-stone-800")}>
                                               {item.name}
                                             </p>
@@ -1071,9 +1177,9 @@ export default function Invitation() {
                         </div>
 
                         {/* Footer */}
-                        <div className="shrink-0 p-5 md:p-10 bg-white border-t border-stone-100 flex flex-col sm:flex-row items-center gap-4 md:gap-8 shadow-[0_-10px_50px_rgba(0,0,0,0.05)] relative z-10">
+                        <div className="shrink-0 p-4 md:p-10 bg-white border-t border-stone-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 md:gap-8 shadow-[0_-10px_50px_rgba(0,0,0,0.05)] relative z-10">
                           {menuPreferences.length > 0 && (
-                            <div className="flex-1 flex flex-wrap gap-1.5 md:gap-3">
+                            <div className="flex-1 flex max-h-20 overflow-y-auto flex-wrap gap-1.5 md:max-h-none md:gap-3">
                               {menuPreferences.map(id => {
                                 const item = menuItems.find(m => m.id === id);
                                 return item ? (
@@ -1085,20 +1191,33 @@ export default function Invitation() {
                             </div>
                           )}
                           <Button
-                            onClick={() => setIsMenuModalOpen(false)}
-                            className="shrink-0 w-full sm:w-auto rounded-xl md:rounded-2xl px-8 md:px-12 h-12 md:h-16 bg-stone-900 hover:bg-stone-800 gap-2 md:gap-3 text-sm md:text-lg font-bold shadow-xl transition-transform hover:-translate-y-1"
+                            onClick={handleSavePreferences}
+                            disabled={isSavingPreferences}
+                            className="shrink-0 w-full sm:w-auto rounded-xl md:rounded-2xl px-6 md:px-12 h-12 md:h-16 bg-stone-900 hover:bg-stone-800 gap-2 md:gap-3 text-sm md:text-lg font-bold shadow-xl transition-transform hover:-translate-y-1"
                           >
                             <Check className="w-4 h-4 md:w-6 md:h-6" />
-                            Valider mes choix
+                            {isSavingPreferences ? 'Enregistrement...' : 'Enregistrer mes choix'}
                           </Button>
                         </div>
                       </DialogContent>
                     </Dialog>
+                    {selectedPreferredItems.length > 0 && (
+                      <div className="rounded-2xl border border-primary/10 bg-primary/5 px-5 py-4">
+                        <p className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-primary/70">Vos choix enregistrés</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedPreferredItems.map(item => (
+                            <span key={item.id} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-sm ring-1 ring-primary/10 md:text-sm">
+                              {item.emoji || '•'} {item.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {savedSuccess && (
                     <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-3 md:p-5 bg-green-50/80 border border-green-100 text-green-700 text-xs md:text-base font-bold rounded-xl md:rounded-2xl flex items-center gap-2 md:gap-4 shadow-sm">
-                      <CheckCircle2 className="w-4 h-4 md:w-6 md:h-6 text-green-600" /> Vos préférences ont été enregistrées avec succès.
+                      <CheckCircle2 className="w-4 h-4 md:w-6 md:h-6 text-green-600" /> Vos préférences boissons ont été enregistrées avec succès.
                     </motion.div>
                   )}
 

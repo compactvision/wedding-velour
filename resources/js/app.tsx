@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client';
 import AppLayout from './components/layout/AppLayout';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import BrandLogo from './components/shared/BrandLogo';
+import ServiceWorkerUpdateToast from './components/shared/ServiceWorkerUpdateToast';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'Wedding Velour';
 const isBrowser =
     typeof window !== 'undefined' && typeof document !== 'undefined';
 const appElement = isBrowser ? document.getElementById('app') : null;
@@ -17,11 +18,55 @@ const isSandboxedPreview =
     (window.location.origin === 'null' ||
         !['http:', 'https:'].includes(window.location.protocol));
 
+function notifyServiceWorkerUpdate(registration: ServiceWorkerRegistration) {
+    window.dispatchEvent(
+        new CustomEvent('pwa-update-ready', {
+            detail: { registration },
+        }),
+    );
+}
+
+function watchServiceWorker(registration: ServiceWorkerRegistration) {
+    if (registration.waiting && navigator.serviceWorker.controller) {
+        notifyServiceWorkerUpdate(registration);
+    }
+
+    registration.addEventListener('updatefound', () => {
+        const worker = registration.installing;
+        if (!worker) return;
+
+        worker.addEventListener('statechange', () => {
+            if (
+                worker.state === 'installed' &&
+                registration.waiting &&
+                navigator.serviceWorker.controller
+            ) {
+                notifyServiceWorkerUpdate(registration);
+            }
+        });
+    });
+}
+
 if (isBrowser && !isSandboxedPreview && import.meta.env.PROD) {
     window.addEventListener('load', () => {
         try {
             if ('serviceWorker' in navigator) {
-                void navigator.serviceWorker.register('/sw.js');
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (refreshing) return;
+                    refreshing = true;
+                    window.location.reload();
+                });
+
+                void navigator.serviceWorker
+                    .register('/sw.js', { scope: '/', updateViaCache: 'none' })
+                    .then(registration => {
+                        watchServiceWorker(registration);
+                        void registration.update();
+                        window.setInterval(() => {
+                            void registration.update();
+                        }, 60 * 60 * 1000);
+                    });
             }
         } catch {
             // Sandboxed previews can throw when merely reading navigator.serviceWorker.
@@ -113,6 +158,7 @@ if (!isBrowser || !appElement) {
             root.render(
                 <QueryClientProvider client={queryClient}>
                     <App {...props} />
+                    <ServiceWorkerUpdateToast />
                 </QueryClientProvider>,
             );
         },

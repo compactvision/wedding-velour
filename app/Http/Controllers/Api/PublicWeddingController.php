@@ -19,6 +19,12 @@ class PublicWeddingController extends Controller
     public function invitation(string $token): JsonResponse
     {
         $guest = GuestModel::where('invitation_link', $token)->firstOrFail();
+        $menuItems = MenuItemModel::where('wedding_id', $guest->wedding_id)->orderBy('sort_order')->get();
+        $selectedMenuItems = collect($guest->menu_preferences ?? [])
+            ->map(fn ($id) => $menuItems->firstWhere('id', $id))
+            ->filter()
+            ->values();
+        $guest->setAttribute('selected_menu_items', $selectedMenuItems);
 
         return response()->json([
             'guest' => $guest,
@@ -28,7 +34,7 @@ class PublicWeddingController extends Controller
             'co_guests' => $guest->table_id
                 ? GuestModel::where('table_id', $guest->table_id)->whereKeyNot($guest->id)->get()
                 : [],
-            'menu_items' => MenuItemModel::where('wedding_id', $guest->wedding_id)->orderBy('sort_order')->get(),
+            'menu_items' => $menuItems,
             'orders' => OrderModel::where('guest_id', $guest->id)->latest()->get(),
         ]);
     }

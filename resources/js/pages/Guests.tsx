@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MessageCircle, MoreHorizontal, Pencil, Plus, QrCode, Search, Trash2, Users } from 'lucide-react';
+import { GlassWater, MessageCircle, MoreHorizontal, Pencil, Plus, QrCode, Search, Trash2, Users } from 'lucide-react';
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import BulkWhatsappInviteDialog from '@/components/guests/BulkWhatsappInviteDialog';
@@ -31,6 +31,11 @@ export default function Guests() {
   const { data: guests = [] } = useQuery({
     queryKey: ['guests', activeWeddingId],
     queryFn: () => base44.entities.Guest.filter({ wedding_id: activeWeddingId }),
+    enabled: !!activeWeddingId,
+  });
+  const { data: menuItems = [] } = useQuery({
+    queryKey: ['menu-items', activeWeddingId],
+    queryFn: () => base44.entities.MenuItem.filter({ wedding_id: activeWeddingId }),
     enabled: !!activeWeddingId,
   });
 
@@ -93,6 +98,11 @@ export default function Guests() {
   const confirmedPeople = guests
     .filter(g => g.status === 'confirmed')
     .reduce((sum, guest) => sum + partySize(guest), 0);
+  const menuItemById = new Map(menuItems.map(item => [item.id, item]));
+  const preferenceLabels = (guest) => (guest.menu_preferences || [])
+    .map(id => menuItemById.get(id))
+    .filter(Boolean)
+    .map(item => `${item.emoji || '•'} ${item.name}`);
 
   return (
     <div>
@@ -146,6 +156,7 @@ export default function Guests() {
                   <th className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4">Rôle</th>
                   <th className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4">Statut</th>
                   <th className="text-center text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4">Accompagnants</th>
+                  <th className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4">Préférences boissons</th>
                   <th className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4">Tél.</th>
                   <th className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground py-3 px-4 w-12"></th>
                 </tr>
@@ -155,6 +166,7 @@ export default function Guests() {
                   <GuestRow
                     key={guest.id}
                     guest={guest}
+                    preferences={preferenceLabels(guest)}
                     onEdit={handleEdit}
                     onDelete={(g) => deleteMutation.mutate(g.id)}
                     onStatusChange={handleStatusChange}
@@ -187,6 +199,16 @@ export default function Guests() {
                       <span className="block text-muted-foreground">Accomp.</span>
                       <span className="font-medium">{guest.companions || 0}</span>
                     </div>
+                  </div>
+                  <div className="mt-3 rounded-md bg-muted px-3 py-2 text-xs">
+                    <span className="mb-1 flex items-center gap-1 text-muted-foreground">
+                      <GlassWater className="h-3.5 w-3.5" /> Préférences boissons
+                    </span>
+                    {preferenceLabels(guest).length > 0 ? (
+                      <span className="font-medium">{preferenceLabels(guest).join(', ')}</span>
+                    ) : (
+                      <span className="text-muted-foreground">Non renseigné</span>
+                    )}
                   </div>
                 </div>
                 <DropdownMenu>

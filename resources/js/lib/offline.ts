@@ -78,8 +78,13 @@ export async function cachedGet<T>(url: string, config?: AxiosRequestConfig): Pr
     await cacheApiResponse(key, response.data);
     return response.data;
   } catch (error) {
-    const cached = await getCachedApiResponse<T>(key);
-    if (cached !== null) return cached;
+    const record = await runStore<CacheRecord | undefined>(CACHE_STORE, 'readonly', store => store.get(key));
+    if (record?.data !== undefined) {
+      window.dispatchEvent(new CustomEvent('offline-cache-hit', {
+        detail: { key, updatedAt: record.updatedAt },
+      }));
+      return record.data as T;
+    }
     throw error;
   }
 }
@@ -154,4 +159,3 @@ export async function syncOfflineQueue(): Promise<{ synced: number; remaining: n
   window.dispatchEvent(new CustomEvent('offline-sync-complete', { detail: { synced, remaining } }));
   return { synced, remaining };
 }
-

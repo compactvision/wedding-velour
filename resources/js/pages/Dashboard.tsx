@@ -9,10 +9,10 @@ import EmptyState from '@/components/shared/EmptyState';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Users, UtensilsCrossed, TableProperties, Camera, Clock, Plus, Heart, CalendarDays, Pencil } from 'lucide-react';
+import { Users, UtensilsCrossed, TableProperties, Clock, Plus, Heart, CalendarDays, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -135,8 +135,10 @@ function WeddingFormDialog({ open, onOpenChange, wedding = null }) {
 
 export default function Dashboard() {
   const { weddings, activeWedding, activeWeddingId, setActiveWeddingId, isLoading } = useActiveWedding();
+  const queryClient = useQueryClient();
   const [showNewWedding, setShowNewWedding] = useState(false);
   const [showEditWedding, setShowEditWedding] = useState(false);
+  const [showDeleteWedding, setShowDeleteWedding] = useState(false);
 
   const { data: guests = [] } = useQuery({
     queryKey: ['guests', activeWeddingId],
@@ -169,6 +171,20 @@ export default function Dashboard() {
     .reduce((sum, guest) => sum + partySize(guest), 0);
   const pendingOrders = orders.filter(o => o.status === 'pending').length;
   const totalCompanions = guests.reduce((sum, g) => sum + (g.companions || 0), 0);
+  const deleteWeddingMutation = useMutation({
+    mutationFn: (id: string) => base44.entities.Wedding.delete(id),
+    onSuccess: async () => {
+      const nextWedding = weddings.find(w => w.id !== activeWeddingId) || null;
+      if (nextWedding) {
+        setActiveWeddingId(nextWedding.id);
+      } else {
+        localStorage.removeItem('activeWeddingId');
+        setActiveWeddingId(null);
+      }
+      setShowDeleteWedding(false);
+      await queryClient.invalidateQueries({ queryKey: ['weddings'] });
+    },
+  });
 
   if (!activeWedding && !isLoading) {
     return (
@@ -206,15 +222,21 @@ export default function Dashboard() {
       <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
         {/* Wedding Info */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
             <CardTitle className="font-display text-lg flex items-center gap-2">
               <CalendarDays className="w-5 h-5 text-primary" />
               Informations
             </CardTitle>
-            <Button variant="outline" size="sm" onClick={() => setShowEditWedding(true)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Modifier
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowEditWedding(true)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Modifier
+              </Button>
+              <Button variant="outline" size="sm" className="border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => setShowDeleteWedding(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Supprimer
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-start justify-between gap-4">
@@ -339,6 +361,29 @@ export default function Dashboard() {
 
       <WeddingFormDialog open={showNewWedding} onOpenChange={setShowNewWedding} />
       <WeddingFormDialog open={showEditWedding} onOpenChange={setShowEditWedding} wedding={activeWedding} />
+      <Dialog open={showDeleteWedding} onOpenChange={setShowDeleteWedding}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">Supprimer ce mariage ?</DialogTitle>
+            <DialogDescription>
+              Cette action supprimera aussi les invités, tables, menus, commandes, photos et programme liés à {activeWedding?.title || 'ce mariage'}.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteWedding(false)}>
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!activeWeddingId || deleteWeddingMutation.isPending}
+              onClick={() => activeWeddingId && deleteWeddingMutation.mutate(activeWeddingId)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {deleteWeddingMutation.isPending ? 'Suppression...' : 'Supprimer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
