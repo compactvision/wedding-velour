@@ -7,6 +7,7 @@ use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PlatformAdminController;
 use App\Http\Controllers\PlatformPricingController;
 use App\Http\Controllers\TeamInvitationController;
+use App\Models\Plan;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -17,7 +18,27 @@ Route::middleware('guest')->group(function () {
     Route::post('/register', [RegisteredUserController::class, 'store']);
 });
 
-Route::get('/', fn () => Inertia::render('welcome'))->name('landing');
+Route::get('/', function () {
+    $now = now();
+
+    return Inertia::render('welcome', [
+        'plans' => Plan::query()
+            ->where('status', 'active')
+            ->where(fn ($query) => $query->whereNull('valid_from')->orWhere('valid_from', '<=', $now))
+            ->where(fn ($query) => $query->whereNull('valid_until')->orWhere('valid_until', '>=', $now))
+            ->orderBy('sort_order')
+            ->get()
+            ->map(fn (Plan $plan) => [
+                'slug' => $plan->slug,
+                'name' => $plan->name,
+                'description' => $plan->description,
+                'billing_model' => $plan->billing_model,
+                'currency' => $plan->currency,
+                'base_price_minor' => $plan->base_price_minor,
+                'limits' => $plan->limits ?? [],
+            ]),
+    ]);
+})->name('landing');
 
 Route::get('/home', fn () => redirect()->route(auth()->check() ? 'dashboard' : 'landing'))
     ->name('home');

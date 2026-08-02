@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -13,9 +14,19 @@ class LandingPageTest extends TestCase
 
     public function test_landing_page_is_public(): void
     {
+        Plan::query()->where('slug', 'essential')->update([
+            'base_price_minor' => 4200,
+            'currency' => 'USD',
+        ]);
+
         $this->get('/')
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('welcome'));
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('welcome')
+                ->has('plans', 4)
+                ->where('plans.0.slug', 'essential')
+                ->where('plans.0.base_price_minor', 4200)
+                ->where('plans.0.currency', 'USD'));
     }
 
     public function test_authenticated_manager_without_an_event_starts_onboarding(): void

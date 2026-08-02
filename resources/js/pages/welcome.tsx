@@ -52,41 +52,72 @@ const features = [
     },
 ];
 
-const plans = [
-    {
-        name: 'Essentiel',
-        price: '29 €',
-        description: 'Pour organiser un événement simplement.',
-        features: ['Invités et RSVP', 'Programme', 'Invitations', 'Galerie'],
-        featured: false,
-    },
-    {
-        name: 'Pro',
-        price: '79 €',
-        description: 'Pour piloter tous les aspects de votre événement.',
-        features: [
-            'Tous les modules Essentiel',
-            'Budget et prestataires',
-            'Stock et documents',
-            'Équipe et contrôle QR',
-        ],
-        featured: true,
-    },
-    {
-        name: 'Entreprise',
-        price: 'Sur devis',
-        description: 'Pour les agences et événements complexes.',
-        features: [
-            'Événements multiples',
-            'Billetterie avancée',
-            'Accompagnement prioritaire',
-            'Limites personnalisées',
-        ],
-        featured: false,
-    },
-];
+type PublicPlan = {
+    slug: string;
+    name: string;
+    description: string | null;
+    billing_model: string;
+    currency: string;
+    base_price_minor: number;
+    limits: {
+        max_guests?: number;
+        max_users?: number;
+        max_modules?: number;
+        storage_gb?: number;
+    };
+};
 
-export default function Welcome() {
+const formatPrice = (plan: PublicPlan) => {
+    if (plan.billing_model === 'enterprise') {
+        return 'Sur devis';
+    }
+
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: plan.currency || 'USD',
+        maximumFractionDigits: plan.base_price_minor % 100 === 0 ? 0 : 2,
+    }).format(plan.base_price_minor / 100);
+};
+
+const planFeatures = (plan: PublicPlan) => {
+    if (plan.billing_model === 'enterprise') {
+        return [
+            'Événements multiples',
+            'Limites personnalisées',
+            'Accompagnement prioritaire',
+        ];
+    }
+
+    const features = [];
+
+    if (plan.limits.max_guests) {
+        features.push(
+            `Jusqu’à ${plan.limits.max_guests.toLocaleString('fr-FR')} invités`,
+        );
+    }
+
+    if (plan.limits.max_users) {
+        features.push(
+            `${plan.limits.max_users.toLocaleString('fr-FR')} membres d’équipe`,
+        );
+    }
+
+    if (plan.limits.max_modules) {
+        features.push(
+            `${plan.limits.max_modules.toLocaleString('fr-FR')} modules inclus`,
+        );
+    }
+
+    if (plan.limits.storage_gb) {
+        features.push(
+            `${plan.limits.storage_gb.toLocaleString('fr-FR')} Go de stockage`,
+        );
+    }
+
+    return features;
+};
+
+export default function Welcome({ plans }: { plans: PublicPlan[] }) {
     const { auth } = usePage().props as any;
     const [mobileOpen, setMobileOpen] = useState(false);
     const startHref = auth?.user ? '/workspace' : '/register';
@@ -368,38 +399,41 @@ export default function Welcome() {
                                     Un forfait adapté à votre ambition
                                 </h2>
                             </div>
-                            <div className="mt-14 grid gap-5 lg:grid-cols-3">
+                            <div className="mt-14 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                                 {plans.map((plan) => (
                                     <div
-                                        key={plan.name}
-                                        className={`rounded-3xl p-7 ${plan.featured ? 'bg-primary ring-2 ring-amber-300' : 'bg-white/5 ring-1 ring-white/10'}`}
+                                        key={plan.slug}
+                                        className={`rounded-3xl p-7 ${plan.slug === 'standard' ? 'bg-primary ring-2 ring-amber-300' : 'bg-white/5 ring-1 ring-white/10'}`}
                                     >
                                         <div className="text-lg font-semibold">
                                             {plan.name}
                                         </div>
                                         <div className="mt-5 text-4xl font-bold">
-                                            {plan.price}
+                                            {formatPrice(plan)}
                                         </div>
                                         <p
-                                            className={`mt-3 ${plan.featured ? 'text-amber-50' : 'text-stone-400'}`}
+                                            className={`mt-3 ${plan.slug === 'standard' ? 'text-amber-50' : 'text-stone-400'}`}
                                         >
-                                            {plan.description}
+                                            {plan.description ||
+                                                'Une formule adaptée à votre événement.'}
                                         </p>
                                         <ul className="mt-7 space-y-3">
-                                            {plan.features.map((feature) => (
-                                                <li
-                                                    key={feature}
-                                                    className="flex gap-2 text-sm"
-                                                >
-                                                    <Check className="h-5 w-5 shrink-0" />
-                                                    {feature}
-                                                </li>
-                                            ))}
+                                            {planFeatures(plan).map(
+                                                (feature) => (
+                                                    <li
+                                                        key={feature}
+                                                        className="flex gap-2 text-sm"
+                                                    >
+                                                        <Check className="h-5 w-5 shrink-0" />
+                                                        {feature}
+                                                    </li>
+                                                ),
+                                            )}
                                         </ul>
                                         <Button
                                             className="mt-8 w-full"
                                             variant={
-                                                plan.featured
+                                                plan.slug === 'standard'
                                                     ? 'secondary'
                                                     : 'outline'
                                             }
