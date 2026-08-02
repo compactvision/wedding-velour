@@ -2,9 +2,32 @@
 
 namespace App\Providers;
 
+use App\Application\Common\CommandBus;
+use App\Application\Common\QueryBus;
+use App\Domain\Wedding\Repositories\GuestRepositoryInterface;
+use App\Domain\Wedding\Repositories\MenuItemRepositoryInterface;
+use App\Domain\Wedding\Repositories\OrderRepositoryInterface;
+use App\Domain\Wedding\Repositories\PhotoRepositoryInterface;
+use App\Domain\Wedding\Repositories\TimelineEventRepositoryInterface;
+use App\Domain\Wedding\Repositories\WeddingNotificationRepositoryInterface;
+use App\Domain\Wedding\Repositories\WeddingRepositoryInterface;
+use App\Domain\Wedding\Repositories\WeddingTableRepositoryInterface;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentGuestRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentMenuItemRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrderRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentPhotoRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentTimelineEventRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentWeddingNotificationRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentWeddingRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentWeddingTableRepository;
+use App\Models\Event;
+use App\Models\Organization;
+use App\Policies\EventPolicy;
+use App\Policies\OrganizationPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -16,40 +39,40 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(
-            \App\Domain\Wedding\Repositories\WeddingRepositoryInterface::class,
-            \App\Infrastructure\Persistence\Eloquent\Repositories\EloquentWeddingRepository::class
+            WeddingRepositoryInterface::class,
+            EloquentWeddingRepository::class
         );
         $this->app->singleton(
-            \App\Domain\Wedding\Repositories\GuestRepositoryInterface::class,
-            \App\Infrastructure\Persistence\Eloquent\Repositories\EloquentGuestRepository::class
+            GuestRepositoryInterface::class,
+            EloquentGuestRepository::class
         );
         $this->app->singleton(
-            \App\Domain\Wedding\Repositories\WeddingTableRepositoryInterface::class,
-            \App\Infrastructure\Persistence\Eloquent\Repositories\EloquentWeddingTableRepository::class
+            WeddingTableRepositoryInterface::class,
+            EloquentWeddingTableRepository::class
         );
         $this->app->singleton(
-            \App\Domain\Wedding\Repositories\MenuItemRepositoryInterface::class,
-            \App\Infrastructure\Persistence\Eloquent\Repositories\EloquentMenuItemRepository::class
+            MenuItemRepositoryInterface::class,
+            EloquentMenuItemRepository::class
         );
         $this->app->singleton(
-            \App\Domain\Wedding\Repositories\OrderRepositoryInterface::class,
-            \App\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrderRepository::class
+            OrderRepositoryInterface::class,
+            EloquentOrderRepository::class
         );
         $this->app->singleton(
-            \App\Domain\Wedding\Repositories\PhotoRepositoryInterface::class,
-            \App\Infrastructure\Persistence\Eloquent\Repositories\EloquentPhotoRepository::class
+            PhotoRepositoryInterface::class,
+            EloquentPhotoRepository::class
         );
         $this->app->singleton(
-            \App\Domain\Wedding\Repositories\TimelineEventRepositoryInterface::class,
-            \App\Infrastructure\Persistence\Eloquent\Repositories\EloquentTimelineEventRepository::class
+            TimelineEventRepositoryInterface::class,
+            EloquentTimelineEventRepository::class
         );
         $this->app->singleton(
-            \App\Domain\Wedding\Repositories\WeddingNotificationRepositoryInterface::class,
-            \App\Infrastructure\Persistence\Eloquent\Repositories\EloquentWeddingNotificationRepository::class
+            WeddingNotificationRepositoryInterface::class,
+            EloquentWeddingNotificationRepository::class
         );
 
-        $this->app->singleton(\App\Application\Common\CommandBus::class);
-        $this->app->singleton(\App\Application\Common\QueryBus::class);
+        $this->app->singleton(CommandBus::class);
+        $this->app->singleton(QueryBus::class);
     }
 
     /**
@@ -58,6 +81,14 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        Gate::policy(
+            Organization::class,
+            OrganizationPolicy::class,
+        );
+        Gate::policy(
+            Event::class,
+            EventPolicy::class,
+        );
     }
 
     /**

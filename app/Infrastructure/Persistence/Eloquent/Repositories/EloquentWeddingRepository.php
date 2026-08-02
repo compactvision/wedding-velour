@@ -5,28 +5,30 @@ namespace App\Infrastructure\Persistence\Eloquent\Repositories;
 use App\Domain\Wedding\Entities\Wedding;
 use App\Domain\Wedding\Repositories\WeddingRepositoryInterface;
 use App\Infrastructure\Persistence\Eloquent\WeddingModel;
+use Illuminate\Support\Str;
 
 class EloquentWeddingRepository implements WeddingRepositoryInterface
 {
     public function find(string $id): ?Wedding
     {
         $model = WeddingModel::find($id);
+
         return $model ? $this->toDomain($model) : null;
     }
 
     public function save(Wedding $wedding): void
     {
         WeddingModel::updateOrCreate(
-            ['id' => $wedding->id ?? (string) \Illuminate\Support\Str::uuid()],
+            ['id' => $wedding->id ?? (string) Str::uuid()],
             [
-                'title'         => $wedding->title,
-                'date'          => $wedding->date,
-                'venue'         => $wedding->venue,
+                'title' => $wedding->title,
+                'date' => $wedding->date,
+                'venue' => $wedding->venue,
                 'venue_address' => $wedding->venueAddress,
-                'cover_image'   => $wedding->coverImage,
-                'status'        => $wedding->status,
-                'max_guests'    => $wedding->maxGuests,
-                'notes'         => $wedding->notes,
+                'cover_image' => $wedding->coverImage,
+                'status' => $wedding->status,
+                'max_guests' => $wedding->maxGuests,
+                'notes' => $wedding->notes,
                 'invitation_custom' => $wedding->invitationCustom,
             ]
         );
@@ -41,7 +43,7 @@ class EloquentWeddingRepository implements WeddingRepositoryInterface
     {
         return WeddingModel::orderByDesc('created_at')
             ->get()
-            ->map(fn($m) => $this->toDomain($m))
+            ->map(fn ($m) => $this->toDomain($m))
             ->all();
     }
 

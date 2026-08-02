@@ -58,9 +58,10 @@ class AuthenticatedSessionController extends Controller
     private function homeFor(string $role): string
     {
         return match ($role) {
+            'superadmin' => '/superadmin',
             'door' => '/door',
             'server' => '/server',
-            'manager' => '/manager',
+            'manager' => '/onboarding',
             default => '/',
         };
     }

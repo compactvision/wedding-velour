@@ -26,6 +26,10 @@ class EnsureUserHasRole
             ]);
         }
 
+        if (in_array('superadmin', $roles, true) && ! $user->isSuperAdmin()) {
+            abort(403, 'Cet espace est réservé au superadministrateur.');
+        }
+
         if (! $user->isAdmin() && ! in_array($user->role, $roles, true)) {
             abort(403, 'Vous n’avez pas accès à cet espace.');
         }

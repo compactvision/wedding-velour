@@ -1,11 +1,12 @@
 import { createInertiaApp } from '@inertiajs/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoot } from 'react-dom/client';
 import AppLayout from './components/layout/AppLayout';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import SuperAdminLayout from './components/layout/SuperAdminLayout';
 import BrandLogo from './components/shared/BrandLogo';
 import ServiceWorkerUpdateToast from './components/shared/ServiceWorkerUpdateToast';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Wedding Velour';
+const appName = import.meta.env.VITE_APP_NAME || 'Planivo';
 const isBrowser =
     typeof window !== 'undefined' && typeof document !== 'undefined';
 const appElement = isBrowser ? document.getElementById('app') : null;
@@ -33,7 +34,10 @@ function watchServiceWorker(registration: ServiceWorkerRegistration) {
 
     registration.addEventListener('updatefound', () => {
         const worker = registration.installing;
-        if (!worker) return;
+
+        if (!worker) {
+            return;
+        }
 
         worker.addEventListener('statechange', () => {
             if (
@@ -52,20 +56,29 @@ if (isBrowser && !isSandboxedPreview && import.meta.env.PROD) {
         try {
             if ('serviceWorker' in navigator) {
                 let refreshing = false;
-                navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    if (refreshing) return;
-                    refreshing = true;
-                    window.location.reload();
-                });
+                navigator.serviceWorker.addEventListener(
+                    'controllerchange',
+                    () => {
+                        if (refreshing) {
+                            return;
+                        }
+
+                        refreshing = true;
+                        window.location.reload();
+                    },
+                );
 
                 void navigator.serviceWorker
                     .register('/sw.js', { scope: '/', updateViaCache: 'none' })
-                    .then(registration => {
+                    .then((registration) => {
                         watchServiceWorker(registration);
                         void registration.update();
-                        window.setInterval(() => {
-                            void registration.update();
-                        }, 60 * 60 * 1000);
+                        window.setInterval(
+                            () => {
+                                void registration.update();
+                            },
+                            60 * 60 * 1000,
+                        );
                     });
             }
         } catch {
@@ -99,7 +112,7 @@ if (!isBrowser || !appElement) {
             <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
                 <BrandLogo variant="full" className="mx-auto mb-4 h-36 w-64" />
                 <h1 className="font-display text-2xl font-semibold text-stone-800">
-                    Ouvrir Wedding Velour
+                    Ouvrir Planivo
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-stone-600">
                     Cet aperçu sécurisé bloque les sessions, la navigation et le
@@ -132,6 +145,7 @@ if (!isBrowser || !appElement) {
 
             const page: any = await resolvePage();
             const component = page.default;
+            const superAdminPages = ['SuperAdminDashboard', 'PricingSettings'];
 
             const nonAdminPages = [
                 'welcome',
@@ -140,10 +154,19 @@ if (!isBrowser || !appElement) {
                 'ServerInterface',
                 'DoorAgent',
                 'TableMenu',
+                'Onboarding',
+                'TeamInvitation',
                 'auth/Login',
             ];
 
-            if (!nonAdminPages.includes(name)) {
+            if (superAdminPages.includes(name)) {
+                component.layout =
+                    component.layout ||
+                    ((p: any) => <SuperAdminLayout>{p}</SuperAdminLayout>);
+            } else if (
+                !nonAdminPages.includes(name) &&
+                !name.startsWith('auth/')
+            ) {
                 component.layout =
                     component.layout ||
                     ((p: any) => <AppLayout children={p} />);

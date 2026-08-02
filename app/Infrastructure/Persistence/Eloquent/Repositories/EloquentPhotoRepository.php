@@ -5,27 +5,29 @@ namespace App\Infrastructure\Persistence\Eloquent\Repositories;
 use App\Domain\Wedding\Entities\Photo;
 use App\Domain\Wedding\Repositories\PhotoRepositoryInterface;
 use App\Infrastructure\Persistence\Eloquent\PhotoModel;
+use Illuminate\Support\Str;
 
 class EloquentPhotoRepository implements PhotoRepositoryInterface
 {
     public function find(string $id): ?Photo
     {
         $m = PhotoModel::find($id);
+
         return $m ? $this->toDomain($m) : null;
     }
 
     public function save(Photo $photo): void
     {
         PhotoModel::updateOrCreate(
-            ['id' => $photo->id ?? (string) \Illuminate\Support\Str::uuid()],
+            ['id' => $photo->id ?? (string) Str::uuid()],
             [
-                'wedding_id'    => $photo->weddingId,
-                'url'           => $photo->url,
+                'wedding_id' => $photo->weddingId,
+                'url' => $photo->url,
                 'thumbnail_url' => $photo->thumbnailUrl,
-                'caption'       => $photo->caption,
-                'uploaded_by'   => $photo->uploadedBy,
-                'category'      => $photo->category,
-                'is_featured'   => $photo->isFeatured,
+                'caption' => $photo->caption,
+                'uploaded_by' => $photo->uploadedBy,
+                'category' => $photo->category,
+                'is_featured' => $photo->isFeatured,
             ]
         );
     }
@@ -41,7 +43,8 @@ class EloquentPhotoRepository implements PhotoRepositoryInterface
         foreach ($criteria as $key => $value) {
             $query->where($key, $value);
         }
-        return $query->get()->map(fn($m) => $this->toDomain($m))->all();
+
+        return $query->get()->map(fn ($m) => $this->toDomain($m))->all();
     }
 
     private function toDomain(PhotoModel $m): Photo

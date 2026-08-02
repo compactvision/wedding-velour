@@ -11,13 +11,14 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         User::updateOrCreate(
-            ['email' => 'admin@weddingvelour.com'],
+            ['email' => config('planivo.platform_admin_email')],
             [
-                'name' => 'Administrateur Wedding Velour',
-                'password' => Hash::make('P@ssword2026!'),
-                'role' => 'admin',
+                'name' => 'Superadministrateur Planivo',
+                'password' => Hash::make(config('app.admin_password')),
+                'role' => 'superadmin',
                 'wedding_id' => null,
                 'is_active' => true,
+                'status' => 'active',
                 'email_verified_at' => now(),
             ],
         );

@@ -12,7 +12,8 @@ class AccessControlTest extends TestCase
 
     public function test_unauthenticated_users_are_redirected_to_login(): void
     {
-        $this->get('/')->assertRedirect(route('login'));
+        $this->get('/')->assertOk();
+        $this->get('/dashboard')->assertRedirect(route('login'));
         $this->get('/door')->assertRedirect(route('login'));
         $this->get('/server')->assertRedirect(route('login'));
     }
@@ -25,7 +26,7 @@ class AccessControlTest extends TestCase
         ]);
 
         $this->actingAs($agent)->get('/door')->assertOk();
-        $this->actingAs($agent)->get('/')->assertForbidden();
+        $this->actingAs($agent)->get('/dashboard')->assertForbidden();
         $this->actingAs($agent)->get('/server')->assertForbidden();
     }
 

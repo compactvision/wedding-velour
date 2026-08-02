@@ -5,26 +5,28 @@ namespace App\Infrastructure\Persistence\Eloquent\Repositories;
 use App\Domain\Wedding\Entities\WeddingNotification;
 use App\Domain\Wedding\Repositories\WeddingNotificationRepositoryInterface;
 use App\Infrastructure\Persistence\Eloquent\WeddingNotificationModel;
+use Illuminate\Support\Str;
 
 class EloquentWeddingNotificationRepository implements WeddingNotificationRepositoryInterface
 {
     public function find(string $id): ?WeddingNotification
     {
         $m = WeddingNotificationModel::find($id);
+
         return $m ? $this->toDomain($m) : null;
     }
 
     public function save(WeddingNotification $notification): void
     {
         WeddingNotificationModel::updateOrCreate(
-            ['id' => $notification->id ?? (string) \Illuminate\Support\Str::uuid()],
+            ['id' => $notification->id ?? (string) Str::uuid()],
             [
-                'wedding_id'  => $notification->weddingId,
-                'title'       => $notification->title,
-                'message'     => $notification->message,
-                'type'        => $notification->type,
+                'wedding_id' => $notification->weddingId,
+                'title' => $notification->title,
+                'message' => $notification->message,
+                'type' => $notification->type,
                 'target_role' => $notification->targetRole,
-                'is_read'     => $notification->isRead,
+                'is_read' => $notification->isRead,
                 'target_user' => $notification->targetUser,
             ]
         );
@@ -41,7 +43,8 @@ class EloquentWeddingNotificationRepository implements WeddingNotificationReposi
         foreach ($criteria as $key => $value) {
             $query->where($key, $value);
         }
-        return $query->orderByDesc('created_at')->get()->map(fn($m) => $this->toDomain($m))->all();
+
+        return $query->orderByDesc('created_at')->get()->map(fn ($m) => $this->toDomain($m))->all();
     }
 
     private function toDomain(WeddingNotificationModel $m): WeddingNotification

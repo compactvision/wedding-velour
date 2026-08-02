@@ -27,6 +27,7 @@ interface FloorPlanEditorProps {
   onSaveAll: (positions: Record<string, { x: number; y: number }>) => void;
   roomPolygon: Point[];
   onSaveRoom: (polygon: Point[]) => void;
+  readOnly?: boolean;
 }
 
 // ─── Category colours ──────────────────────────────────────────────────────
@@ -96,7 +97,7 @@ function TableShape({ table, selected, guestCount }: {
 
 // ─── MAIN COMPONENT ────────────────────────────────────────────────────────
 export default function FloorPlanEditor({
-  tables, onUpdatePosition, onSaveAll, roomPolygon, onSaveRoom,
+  tables, onUpdatePosition, onSaveAll, roomPolygon, onSaveRoom, readOnly = false,
 }: FloorPlanEditorProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [mode, setMode] = useState<'move' | 'draw'>('move');
@@ -139,7 +140,7 @@ export default function FloorPlanEditor({
 
   // ── DRAW mode – add polygon vertex ─────────────────────────────────────
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
-    if (mode !== 'draw' || drawingDone) return;
+    if (readOnly || mode !== 'draw' || drawingDone) return;
     const pt = getSVGPoint(e);
     // Close polygon if clicking near first point
     if (polygon.length >= 3) {
@@ -150,7 +151,7 @@ export default function FloorPlanEditor({
       }
     }
     setPolygon(prev => [...prev, pt]);
-  }, [mode, drawingDone, polygon, getSVGPoint]);
+  }, [readOnly, mode, drawingDone, polygon, getSVGPoint]);
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
     if (mode === 'draw' && !drawingDone) {
@@ -160,14 +161,14 @@ export default function FloorPlanEditor({
 
   // ── MOVE mode – drag tables ────────────────────────────────────────────
   const handleTableMouseDown = useCallback((e: React.MouseEvent, id: string) => {
-    if (mode !== 'move') return;
+    if (readOnly || mode !== 'move') return;
     e.stopPropagation();
     setSelected(id);
     setDragging(id);
     const pt = getSVGPoint(e);
     const pos = positions[id] || { x: 0, y: 0 };
     setDragOffset({ x: pt.x - pos.x, y: pt.y - pos.y });
-  }, [mode, positions, getSVGPoint]);
+  }, [readOnly, mode, positions, getSVGPoint]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (mode === 'draw' && !drawingDone) {
@@ -210,7 +211,7 @@ export default function FloorPlanEditor({
 
   // ── Distribute tables automatically ───────────────────────────────────
   const handleAutoLayout = () => {
-    if (tables.length === 0) return;
+    if (readOnly || tables.length === 0) return;
     const cols = Math.ceil(Math.sqrt(tables.length));
     const rows = Math.ceil(tables.length / cols);
     const padX = 80, padY = 70;
@@ -236,6 +237,7 @@ export default function FloorPlanEditor({
         {/* Mode buttons */}
         <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
           <button
+            disabled={readOnly}
             onClick={() => setMode('move')}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
@@ -247,6 +249,7 @@ export default function FloorPlanEditor({
             <Move className="w-4 h-4" /> Déplacer
           </button>
           <button
+            disabled={readOnly}
             onClick={() => { setMode('draw'); setDrawingDone(false); }}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
@@ -280,6 +283,7 @@ export default function FloorPlanEditor({
 
         {/* Actions */}
         <Button variant="outline" size="sm" onClick={handleAutoLayout}
+          disabled={readOnly}
           className="gap-1.5">
           <Square className="w-3.5 h-3.5" /> Disposition auto
         </Button>
@@ -310,7 +314,7 @@ export default function FloorPlanEditor({
           </Badge>
         )}
 
-        <Button size="sm" onClick={handleSave} disabled={!hasUnsaved} className="gap-1.5">
+        <Button size="sm" onClick={handleSave} disabled={readOnly || !hasUnsaved} className="gap-1.5">
           <Save className="w-3.5 h-3.5" /> Sauvegarder positions
         </Button>
       </div>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Application\Invitations\InvitationSettingsService;
 use App\Http\Controllers\Controller;
 use App\Infrastructure\Persistence\Eloquent\GuestModel;
 use App\Infrastructure\Persistence\Eloquent\MenuItemModel;
@@ -10,44 +11,147 @@ use App\Infrastructure\Persistence\Eloquent\TimelineEventModel;
 use App\Infrastructure\Persistence\Eloquent\WeddingModel;
 use App\Infrastructure\Persistence\Eloquent\WeddingNotificationModel;
 use App\Infrastructure\Persistence\Eloquent\WeddingTableModel;
+use App\Models\Event;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class PublicWeddingController extends Controller
 {
-    public function invitation(string $token): JsonResponse
-    {
-        $guest = GuestModel::where('invitation_link', $token)->firstOrFail();
-        $menuItems = MenuItemModel::where('wedding_id', $guest->wedding_id)->orderBy('sort_order')->get();
+    public function invitation(
+        string $token,
+        InvitationSettingsService $invitations,
+    ): JsonResponse {
+        $guest = GuestModel::query()
+            ->where('invitation_link', $token)
+            ->with(['event.settings'])
+            ->firstOrFail();
+        $event = $guest->event;
+        $menuItems = MenuItemModel::query()
+            ->when(
+                $guest->event_id,
+                fn ($query) => $query->where('event_id', $guest->event_id),
+                fn ($query) => $query->where('wedding_id', $guest->wedding_id),
+            )
+            ->where('is_available', true)
+            ->orderBy('sort_order')
+            ->get();
         $selectedMenuItems = collect($guest->menu_preferences ?? [])
             ->map(fn ($id) => $menuItems->firstWhere('id', $id))
             ->filter()
             ->values();
         $guest->setAttribute('selected_menu_items', $selectedMenuItems);
+        $guest->unsetRelation('event');
+        $configuration = $event
+            ? $invitations->forEvent($event)
+            : [];
+        $invitationSubject = $guest->wedding_id
+            ? WeddingModel::findOrFail($guest->wedding_id)
+            : $this->eventAsInvitation($event, $configuration);
+        $announcementAudiences = ['all_guests'];
+        if ($guest->status === 'confirmed') {
+            $announcementAudiences[] = 'confirmed_guests';
+        } elseif ($guest->status === 'invited') {
+            $announcementAudiences[] = 'pending_rsvp';
+        }
+
+        if ($invitationSubject instanceof WeddingModel) {
+            $configuration = [
+                ...($invitationSubject->invitation_custom ?? []),
+                ...$configuration,
+            ];
+            $invitationSubject->setAttribute('invitation_custom', $configuration);
+            if (($configuration['show_event_details'] ?? true) === false) {
+                $invitationSubject->setAttribute('date', null);
+                $invitationSubject->setAttribute('venue', null);
+                $invitationSubject->setAttribute('venue_address', null);
+            }
+        }
 
         return response()->json([
             'guest' => $guest,
-            'wedding' => WeddingModel::findOrFail($guest->wedding_id),
-            'timeline' => TimelineEventModel::where('wedding_id', $guest->wedding_id)->orderBy('time')->get(),
+            'wedding' => $invitationSubject,
+            'timeline' => TimelineEventModel::query()
+                ->when(
+                    $guest->event_id,
+                    fn ($query) => $query->where('event_id', $guest->event_id),
+                    fn ($query) => $query->where('wedding_id', $guest->wedding_id),
+                )
+                ->where('visibility', 'public')
+                ->orderByRaw('starts_at is null')
+                ->orderBy('starts_at')
+                ->orderBy('time')
+                ->get(),
             'table' => $guest->table_id ? WeddingTableModel::find($guest->table_id) : null,
             'co_guests' => $guest->table_id
-                ? GuestModel::where('table_id', $guest->table_id)->whereKeyNot($guest->id)->get()
+                ? GuestModel::where('event_id', $guest->event_id)
+                    ->where('table_id', $guest->table_id)
+                    ->whereKeyNot($guest->id)
+                    ->get()
                 : [],
             'menu_items' => $menuItems,
             'orders' => OrderModel::where('guest_id', $guest->id)->latest()->get(),
+            'announcements' => WeddingNotificationModel::query()
+                ->when(
+                    $guest->event_id,
+                    fn ($query) => $query->where('event_id', $guest->event_id),
+                    fn ($query) => $query->where('wedding_id', $guest->wedding_id),
+                )
+                ->where('scope', 'campaign')
+                ->where('channel', 'in_app')
+                ->where('delivery_status', 'sent')
+                ->whereIn('audience', $announcementAudiences)
+                ->latest('sent_at')
+                ->get([
+                    'id',
+                    'title',
+                    'message',
+                    'type',
+                    'action_url',
+                    'sent_at',
+                ]),
         ]);
     }
 
-    public function respond(Request $request, string $token): JsonResponse
-    {
-        $guest = GuestModel::where('invitation_link', $token)->firstOrFail();
+    public function respond(
+        Request $request,
+        string $token,
+        InvitationSettingsService $invitations,
+    ): JsonResponse {
+        $guest = GuestModel::query()
+            ->where('invitation_link', $token)
+            ->with('event')
+            ->firstOrFail();
         $data = $request->validate([
             'status' => ['required', 'in:attending,confirmed,declined'],
             'rsvp_message' => ['nullable', 'string', 'max:2000'],
             'menu_preferences' => ['nullable', 'array', 'max:5'],
             'menu_preferences.*' => ['uuid'],
         ]);
+
+        $deadline = $guest->event
+            ? $invitations->forEvent($guest->event)['rsvp_deadline'] ?? null
+            : null;
+        if ($deadline) {
+            abort_if(
+                now($guest->event->timezone)->startOfDay()->isAfter($deadline),
+                422,
+                'La date limite de réponse est dépassée.',
+            );
+        }
+
+        if ($data['status'] === 'attending') {
+            $data['status'] = 'confirmed';
+        }
+
+        if (! empty($data['menu_preferences'])) {
+            $validMenuItems = MenuItemModel::query()
+                ->where('event_id', $guest->event_id)
+                ->whereIn('id', $data['menu_preferences'])
+                ->count();
+            abort_unless($validMenuItems === count($data['menu_preferences']), 422);
+        }
 
         $guest->update($data);
 
@@ -62,6 +166,12 @@ class PublicWeddingController extends Controller
             'description' => ['required', 'string', 'max:500'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'offline_uuid' => ['nullable', 'uuid'],
+            'menu_item_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('menu_items', 'id')->where('event_id', $guest->event_id),
+            ],
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $offlineUuid = $data['offline_uuid'] ?? null;
@@ -80,11 +190,24 @@ class PublicWeddingController extends Controller
     public function tableMenu(string $tableId): JsonResponse
     {
         $table = WeddingTableModel::findOrFail($tableId);
+        $event = $table->event_id ? Event::query()->find($table->event_id) : null;
 
         return response()->json([
             'table' => $table,
-            'wedding' => WeddingModel::findOrFail($table->wedding_id),
-            'menu_items' => MenuItemModel::where('wedding_id', $table->wedding_id)
+            'wedding' => $table->wedding_id
+                ? WeddingModel::findOrFail($table->wedding_id)
+                : [
+                    'id' => $event?->id,
+                    'title' => $event?->name,
+                    'date' => $event?->starts_at?->toDateString(),
+                    'venue' => $event?->venue_name,
+                ],
+            'menu_items' => MenuItemModel::query()
+                ->when(
+                    $table->event_id,
+                    fn ($query) => $query->where('event_id', $table->event_id),
+                    fn ($query) => $query->where('wedding_id', $table->wedding_id),
+                )
                 ->where('is_available', true)
                 ->orderBy('sort_order')
                 ->get(),
@@ -100,15 +223,24 @@ class PublicWeddingController extends Controller
             'description' => ['required', 'string', 'max:500'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'offline_uuid' => ['nullable', 'uuid'],
+            'menu_item_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('menu_items', 'id')->where('event_id', $table->event_id),
+            ],
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $offlineUuid = $data['offline_uuid'] ?? null;
         $attributes = [
             'id' => (string) Str::uuid(),
             'wedding_id' => $table->wedding_id,
+            'organization_id' => $table->organization_id,
+            'event_id' => $table->event_id,
             'table_id' => $table->id,
             'table_name' => $table->name,
             ...$data,
+            'quantity' => $data['quantity'] ?? 1,
             'status' => 'pending',
             'priority' => 'normal',
         ];
@@ -126,6 +258,8 @@ class PublicWeddingController extends Controller
         return [
             'id' => (string) Str::uuid(),
             'wedding_id' => $guest->wedding_id,
+            'organization_id' => $guest->organization_id,
+            'event_id' => $guest->event_id,
             'table_id' => $guest->table_id,
             'table_name' => $guest->table_id
                 ? WeddingTableModel::find($guest->table_id)?->name
@@ -133,6 +267,7 @@ class PublicWeddingController extends Controller
             'guest_id' => $guest->id,
             'guest_name' => "{$guest->first_name} {$guest->last_name}",
             ...$data,
+            'quantity' => $data['quantity'] ?? 1,
             'status' => 'pending',
             'priority' => 'normal',
         ];
@@ -145,6 +280,8 @@ class PublicWeddingController extends Controller
             [
                 'id' => (string) Str::uuid(),
                 'wedding_id' => $order->wedding_id,
+                'organization_id' => $order->organization_id,
+                'event_id' => $order->event_id,
                 'title' => 'Nouvelle commande',
                 'message' => "{$order->guest_name} · {$order->table_name} · {$order->description}",
                 'type' => 'order',
@@ -152,5 +289,32 @@ class PublicWeddingController extends Controller
                 'is_read' => false,
             ],
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function eventAsInvitation(
+        ?Event $event,
+        array $configuration,
+    ): array {
+        abort_unless($event, 404);
+
+        return [
+            'id' => $event->id,
+            'title' => $event->name,
+            'date' => ($configuration['show_event_details'] ?? true)
+                ? $event->starts_at?->toDateString()
+                : null,
+            'venue' => ($configuration['show_event_details'] ?? true)
+                ? $event->venue_name
+                : null,
+            'venue_address' => ($configuration['show_event_details'] ?? true)
+                ? $event->venue_address
+                : null,
+            'status' => $event->status,
+            'max_guests' => $event->estimated_guests,
+            'invitation_custom' => $configuration,
+        ];
     }
 }

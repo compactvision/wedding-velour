@@ -20,8 +20,8 @@ use App\Domain\Wedding\Repositories\WeddingRepositoryInterface;
 use App\Domain\Wedding\Repositories\WeddingTableRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Infrastructure\Persistence\Eloquent\GuestModel;
-use App\Infrastructure\Persistence\Eloquent\WeddingTableModel;
 use App\Infrastructure\Persistence\Eloquent\WeddingNotificationModel;
+use App\Infrastructure\Persistence\Eloquent\WeddingTableModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -93,7 +93,8 @@ class EntityController extends Controller
         }
 
         $user = $request->user();
-        if ($user?->wedding_id && ! $user->isAdmin()) {
+        if ($user && ! $user->isAdmin()) {
+            abort_unless($user->wedding_id, 403, 'Aucun événement ne vous est affecté.');
             $entityKey = strtolower(str_replace(['_', '-'], '', $entityName));
             if ($entityKey === 'wedding') {
                 $criteria['id'] = $user->wedding_id;
@@ -121,6 +122,11 @@ class EntityController extends Controller
         if (! $entity) {
             abort(404);
         }
+        $this->assertEntityWithinLegacyScope(
+            request(),
+            $entityName,
+            $this->serializeEntity($entity),
+        );
 
         return response()->json($this->serializeEntity($entity));
     }
@@ -135,7 +141,13 @@ class EntityController extends Controller
         $id = (string) Str::uuid();
         $data = $request->all();
         $data['id'] = $id;
-        if ($request->user()?->wedding_id && ! $request->user()->isAdmin()) {
+        if (! $request->user()->isAdmin()) {
+            abort_unless($request->user()->wedding_id, 403, 'Aucun événement ne vous est affecté.');
+            abort_if(
+                strtolower(str_replace(['_', '-'], '', $entityName)) === 'wedding',
+                403,
+                'Seul un administrateur peut créer un événement.',
+            );
             $data['wedding_id'] = $request->user()->wedding_id;
         }
 
@@ -154,16 +166,15 @@ class EntityController extends Controller
 
         if (
             strtolower($entityName) === 'guest'
-            && ($existingData['status'] ?? null) !== 'confirmed'
-            && ($updatedData['status'] ?? null) === 'confirmed'
+            && ($data['status'] ?? null) === 'confirmed'
         ) {
             WeddingNotificationModel::firstOrCreate(
                 ['source_key' => "guest-confirmed:{$id}"],
                 [
                     'id' => (string) Str::uuid(),
-                    'wedding_id' => $updatedData['wedding_id'],
+                    'wedding_id' => $data['wedding_id'],
                     'title' => 'Invité arrivé',
-                    'message' => trim(($updatedData['first_name'] ?? '').' '.($updatedData['last_name'] ?? '')).' vient d’être enregistré à l’entrée.',
+                    'message' => trim(($data['first_name'] ?? '').' '.($data['last_name'] ?? '')).' vient d’être enregistré à l’entrée.',
                     'type' => 'info',
                     'target_role' => 'manager',
                     'is_read' => false,
@@ -190,6 +201,7 @@ class EntityController extends Controller
 
         // Merge existing values with updated ones
         $existingData = $this->serializeEntity($existing);
+        $this->assertEntityWithinLegacyScope($request, $entityName, $existingData);
         $updatedData = array_merge($existingData, $request->all(), ['id' => $id]);
         if ($request->user()?->wedding_id && ! $request->user()->isAdmin()) {
             abort_if(
@@ -211,8 +223,18 @@ class EntityController extends Controller
 
     public function destroy(string $entityName, string $id)
     {
-        $this->authorizeAccess(request(), $entityName, 'write');
+        $request = request();
+        $this->authorizeAccess($request, $entityName, 'write');
         $repo = $this->getRepository($entityName);
+        $entity = $repo->find($id);
+        if (! $entity) {
+            abort(404);
+        }
+        $this->assertEntityWithinLegacyScope(
+            $request,
+            $entityName,
+            $this->serializeEntity($entity),
+        );
         $repo->delete($id);
 
         return response()->json(['success' => true]);
@@ -359,5 +381,28 @@ class EntityController extends Controller
         };
 
         abort_unless(in_array($entity, $allowed[$action], true), 403);
+    }
+
+    private function assertEntityWithinLegacyScope(
+        Request $request,
+        string $entityName,
+        array $entityData,
+    ): void {
+        $user = $request->user();
+        if (! $user || $user->isAdmin()) {
+            return;
+        }
+
+        abort_unless($user->wedding_id, 403, 'Aucun événement ne vous est affecté.');
+        $entityKey = strtolower(str_replace(['_', '-'], '', $entityName));
+        $entityWeddingId = $entityKey === 'wedding'
+            ? ($entityData['id'] ?? null)
+            : ($entityData['wedding_id'] ?? null);
+
+        abort_unless(
+            (string) $entityWeddingId === (string) $user->wedding_id,
+            403,
+            'Cette ressource appartient à un autre événement.',
+        );
     }
 }

@@ -5,29 +5,31 @@ namespace App\Infrastructure\Persistence\Eloquent\Repositories;
 use App\Domain\Wedding\Entities\MenuItem;
 use App\Domain\Wedding\Repositories\MenuItemRepositoryInterface;
 use App\Infrastructure\Persistence\Eloquent\MenuItemModel;
+use Illuminate\Support\Str;
 
 class EloquentMenuItemRepository implements MenuItemRepositoryInterface
 {
     public function find(string $id): ?MenuItem
     {
         $m = MenuItemModel::find($id);
+
         return $m ? $this->toDomain($m) : null;
     }
 
     public function save(MenuItem $item): void
     {
         MenuItemModel::updateOrCreate(
-            ['id' => $item->id ?? (string) \Illuminate\Support\Str::uuid()],
+            ['id' => $item->id ?? (string) Str::uuid()],
             [
-                'wedding_id'          => $item->weddingId,
-                'name'                => $item->name,
-                'emoji'               => $item->emoji,
-                'category'            => $item->category,
-                'description'         => $item->description,
-                'available_quantity'  => $item->availableQuantity,
-                'remaining_quantity'  => $item->remainingQuantity,
-                'is_available'        => $item->isAvailable,
-                'sort_order'          => $item->sortOrder,
+                'wedding_id' => $item->weddingId,
+                'name' => $item->name,
+                'emoji' => $item->emoji,
+                'category' => $item->category,
+                'description' => $item->description,
+                'available_quantity' => $item->availableQuantity,
+                'remaining_quantity' => $item->remainingQuantity,
+                'is_available' => $item->isAvailable,
+                'sort_order' => $item->sortOrder,
             ]
         );
     }
@@ -43,7 +45,8 @@ class EloquentMenuItemRepository implements MenuItemRepositoryInterface
         foreach ($criteria as $key => $value) {
             $query->where($key, $value);
         }
-        return $query->orderBy('sort_order')->get()->map(fn($m) => $this->toDomain($m))->all();
+
+        return $query->orderBy('sort_order')->get()->map(fn ($m) => $this->toDomain($m))->all();
     }
 
     private function toDomain(MenuItemModel $m): MenuItem

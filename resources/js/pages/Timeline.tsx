@@ -1,248 +1,825 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link, usePage } from '@inertiajs/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import {
+    CalendarDays,
+    CheckCircle2,
+    Clock,
+    Eye,
+    EyeOff,
+    Image,
+    MapPin,
+    Pencil,
+    Play,
+    Plus,
+    Trash2,
+    UserRound,
+} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useActiveWedding } from '@/hooks/useWedding';
-import PageHeader from '@/components/shared/PageHeader';
-import WeddingSelector from '@/components/shared/WeddingSelector';
+import {
+    ScheduleItem,
+    ScheduleItemPayload,
+    tenantSchedule,
+} from '@/api/tenantClient';
 import EmptyState from '@/components/shared/EmptyState';
+import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Image, Plus, Clock, Play, CheckCircle2, Trash2, Pencil } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
-const categoryIcons = {
-  ceremony: '💒', reception: '🥂', dinner: '🍽️', dance: '💃',
-  speech: '🎤', activity: '🎯', other: '📋'
+const categories: Record<
+    ScheduleItem['category'],
+    { icon: string; label: string }
+> = {
+    ceremony: { icon: '✦', label: 'Cérémonie' },
+    reception: { icon: '🥂', label: 'Réception' },
+    dinner: { icon: '🍽️', label: 'Repas' },
+    dance: { icon: '♫', label: 'Danse' },
+    speech: { icon: '🎤', label: 'Prise de parole' },
+    activity: { icon: '◎', label: 'Activité' },
+    session: { icon: '▣', label: 'Session' },
+    break: { icon: '☕', label: 'Pause' },
+    logistics: { icon: '↗', label: 'Logistique' },
+    other: { icon: '•', label: 'Autre' },
 };
 
-function EventFormDialog({ open, onOpenChange, event, onSave }) {
-  const [form, setForm] = useState({ title: '', description: '', time: '', category: 'other', notify_all: false, image_url: '', sub_details_text: '' });
-  const [uploading, setUploading] = useState(false);
+function toInputDateTime(value?: string | null): string {
+    if (!value) return '';
+    const date = new Date(value);
+    const offset = date.getTimezoneOffset();
+    return new Date(date.getTime() - offset * 60_000)
+        .toISOString()
+        .slice(0, 16);
+}
 
-  React.useEffect(() => {
-    if (event) {
-      setForm({
-        title: event.title || '',
-        description: event.description || '',
-        time: event.time || '',
-        category: event.category || 'other',
-        notify_all: event.notify_all || false,
-        image_url: event.image_url || '',
-        sub_details_text: (event.sub_details || []).join('\n'),
-      });
-    } else {
-      setForm({ title: '', description: '', time: '', category: 'other', notify_all: false, image_url: '', sub_details_text: '' });
-    }
-  }, [event, open]);
+type ScheduleFormProps = {
+    open: boolean;
+    item: ScheduleItem | null;
+    defaultStart: string | null;
+    pending: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSave: (data: ScheduleItemPayload) => void;
+};
 
-  const uploadImage = async (file?: File) => {
-    if (!file) return;
-    setUploading(true);
-    try {
-      const result = await base44.integrations.Core.UploadFile({ file });
-      setForm(prev => ({ ...prev, image_url: result.file_url }));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const submit = () => {
-    const sub_details = form.sub_details_text
-      .split('\n')
-      .map(detail => detail.trim())
-      .filter(Boolean);
-    onSave({
-      title: form.title,
-      description: form.description,
-      time: form.time,
-      category: form.category,
-      notify_all: form.notify_all,
-      image_url: form.image_url || null,
-      sub_details,
+function ScheduleFormDialog({
+    open,
+    item,
+    defaultStart,
+    pending,
+    onOpenChange,
+    onSave,
+}: ScheduleFormProps) {
+    const [form, setForm] = useState({
+        title: '',
+        description: '',
+        starts_at: '',
+        ends_at: '',
+        category: 'other' as ScheduleItem['category'],
+        location: '',
+        responsible_name: '',
+        visibility: 'public' as ScheduleItem['visibility'],
+        notify_all: false,
+        image_url: '',
+        sub_details_text: '',
     });
-  };
+    const [uploading, setUploading] = useState(false);
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle className="font-display">{event ? 'Modifier' : 'Nouvel événement'}</DialogTitle></DialogHeader>
-        <div className="space-y-4">
-          <div><Label>Titre</Label><Input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Entrée des mariés" /></div>
-          <div><Label>Heure</Label><Input type="time" value={form.time} onChange={e => setForm({...form, time: e.target.value})} /></div>
-          <div>
-            <Label>Catégorie</Label>
-            <Select value={form.category} onValueChange={v => setForm({...form, category: v})}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ceremony">Cérémonie</SelectItem>
-                <SelectItem value="reception">Réception</SelectItem>
-                <SelectItem value="dinner">Dîner</SelectItem>
-                <SelectItem value="dance">Danse</SelectItem>
-                <SelectItem value="speech">Discours</SelectItem>
-                <SelectItem value="activity">Activité</SelectItem>
-                <SelectItem value="other">Autre</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div><Label>Description</Label><Textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} /></div>
-          <div className="space-y-2">
-            <Label>Sous-détails</Label>
-            <Textarea
-              value={form.sub_details_text}
-              onChange={e => setForm({...form, sub_details_text: e.target.value})}
-              placeholder={'Entrée des familles\nRéception des invités\nPhotos officielles'}
-              rows={4}
-            />
-            <p className="text-xs text-muted-foreground">Une ligne par étape interne de ce grand événement.</p>
-          </div>
-          <div className="space-y-2">
-            <Label>Photo de section</Label>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Input value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} placeholder="/storage/uploads/photo.jpg" />
-              <Button type="button" variant="outline" className="relative shrink-0 overflow-hidden" disabled={uploading}>
-                <Image className="mr-2 h-4 w-4" />
-                {uploading ? 'Upload...' : 'Importer'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="absolute inset-0 cursor-pointer opacity-0"
-                  onChange={e => uploadImage(e.target.files?.[0])}
-                />
-              </Button>
-            </div>
-            {form.image_url && (
-              <img src={form.image_url} alt="" className="h-32 w-full rounded-lg object-cover" />
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <Switch checked={form.notify_all} onCheckedChange={v => setForm({...form, notify_all: v})} />
-            <Label>Notifier tous les invités</Label>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
-          <Button onClick={submit} disabled={!form.title || !form.time}>Enregistrer</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+    useEffect(() => {
+        const fallback = defaultStart
+            ? toInputDateTime(defaultStart)
+            : toInputDateTime(new Date().toISOString());
+        setForm({
+            title: item?.title || '',
+            description: item?.description || '',
+            starts_at: toInputDateTime(item?.starts_at) || fallback,
+            ends_at: toInputDateTime(item?.ends_at),
+            category: item?.category || 'other',
+            location: item?.location || '',
+            responsible_name: item?.responsible_name || '',
+            visibility: item?.visibility || 'public',
+            notify_all: item?.notify_all || false,
+            image_url: item?.image_url || '',
+            sub_details_text: (item?.sub_details || []).join('\n'),
+        });
+    }, [open, item, defaultStart]);
+
+    const uploadImage = async (file?: File) => {
+        if (!file) return;
+        setUploading(true);
+        try {
+            const result = await base44.integrations.Core.UploadFile({ file });
+            setForm((current) => ({
+                ...current,
+                image_url: result.file_url,
+            }));
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const submit = () => {
+        onSave({
+            title: form.title.trim(),
+            description: form.description.trim() || null,
+            starts_at: new Date(form.starts_at).toISOString(),
+            ends_at: form.ends_at
+                ? new Date(form.ends_at).toISOString()
+                : null,
+            category: form.category,
+            location: form.location.trim() || null,
+            responsible_name: form.responsible_name.trim() || null,
+            visibility: form.visibility,
+            notify_all: form.notify_all,
+            image_url: form.image_url.trim() || null,
+            sub_details: form.sub_details_text
+                .split('\n')
+                .map((detail) => detail.trim())
+                .filter(Boolean),
+        });
+    };
+
+    const invalidEnd =
+        Boolean(form.ends_at) &&
+        new Date(form.ends_at).getTime() <=
+            new Date(form.starts_at).getTime();
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>
+                        {item ? 'Modifier l’activité' : 'Nouvelle activité'}
+                    </DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-2 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                        <Label htmlFor="schedule-title">Titre</Label>
+                        <Input
+                            id="schedule-title"
+                            value={form.title}
+                            onChange={(event) =>
+                                setForm({ ...form, title: event.target.value })
+                            }
+                            placeholder="Accueil des participants"
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="schedule-start">Début</Label>
+                        <Input
+                            id="schedule-start"
+                            type="datetime-local"
+                            value={form.starts_at}
+                            onChange={(event) =>
+                                setForm({
+                                    ...form,
+                                    starts_at: event.target.value,
+                                })
+                            }
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="schedule-end">Fin facultative</Label>
+                        <Input
+                            id="schedule-end"
+                            type="datetime-local"
+                            value={form.ends_at}
+                            onChange={(event) =>
+                                setForm({ ...form, ends_at: event.target.value })
+                            }
+                        />
+                        {invalidEnd && (
+                            <p className="mt-1 text-xs text-destructive">
+                                La fin doit être postérieure au début.
+                            </p>
+                        )}
+                    </div>
+                    <div>
+                        <Label>Catégorie</Label>
+                        <Select
+                            value={form.category}
+                            onValueChange={(category: ScheduleItem['category']) =>
+                                setForm({ ...form, category })
+                            }
+                        >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(categories).map(
+                                    ([value, category]) => (
+                                        <SelectItem key={value} value={value}>
+                                            {category.icon} {category.label}
+                                        </SelectItem>
+                                    ),
+                                )}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <Label>Visibilité</Label>
+                        <Select
+                            value={form.visibility}
+                            onValueChange={(
+                                visibility: ScheduleItem['visibility'],
+                            ) => setForm({ ...form, visibility })}
+                        >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="public">
+                                    Publique — visible par les invités
+                                </SelectItem>
+                                <SelectItem value="internal">
+                                    Interne — équipe uniquement
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <Label htmlFor="schedule-location">Lieu</Label>
+                        <Input
+                            id="schedule-location"
+                            value={form.location}
+                            onChange={(event) =>
+                                setForm({
+                                    ...form,
+                                    location: event.target.value,
+                                })
+                            }
+                            placeholder="Hall principal"
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="schedule-owner">Responsable</Label>
+                        <Input
+                            id="schedule-owner"
+                            value={form.responsible_name}
+                            onChange={(event) =>
+                                setForm({
+                                    ...form,
+                                    responsible_name: event.target.value,
+                                })
+                            }
+                            placeholder="Équipe accueil"
+                        />
+                    </div>
+                    <div className="sm:col-span-2">
+                        <Label htmlFor="schedule-description">Description</Label>
+                        <Textarea
+                            id="schedule-description"
+                            value={form.description}
+                            onChange={(event) =>
+                                setForm({
+                                    ...form,
+                                    description: event.target.value,
+                                })
+                            }
+                            rows={3}
+                        />
+                    </div>
+                    <div className="sm:col-span-2">
+                        <Label htmlFor="schedule-details">
+                            Étapes ou consignes
+                        </Label>
+                        <Textarea
+                            id="schedule-details"
+                            value={form.sub_details_text}
+                            onChange={(event) =>
+                                setForm({
+                                    ...form,
+                                    sub_details_text: event.target.value,
+                                })
+                            }
+                            placeholder={'Ouverture des portes\nBrief de l’équipe\nAccueil VIP'}
+                            rows={3}
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Une consigne par ligne.
+                        </p>
+                    </div>
+                    <div className="sm:col-span-2">
+                        <Label>Illustration facultative</Label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Input
+                                value={form.image_url}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        image_url: event.target.value,
+                                    })
+                                }
+                                placeholder="/storage/uploads/programme.jpg"
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="relative shrink-0 overflow-hidden"
+                                disabled={uploading}
+                            >
+                                <Image className="mr-2 h-4 w-4" />
+                                {uploading ? 'Import…' : 'Importer'}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="absolute inset-0 cursor-pointer opacity-0"
+                                    onChange={(event) =>
+                                        uploadImage(event.target.files?.[0])
+                                    }
+                                />
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 sm:col-span-2">
+                        <Switch
+                            checked={form.notify_all}
+                            onCheckedChange={(notify_all) =>
+                                setForm({ ...form, notify_all })
+                            }
+                        />
+                        <Label>Préparer une notification aux invités</Label>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>
+                        Annuler
+                    </Button>
+                    <Button
+                        onClick={submit}
+                        disabled={
+                            !form.title.trim() ||
+                            !form.starts_at ||
+                            invalidEnd ||
+                            pending
+                        }
+                    >
+                        {pending ? 'Enregistrement…' : 'Enregistrer'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 export default function Timeline() {
-  const { weddings, activeWeddingId, setActiveWeddingId } = useActiveWedding();
-  const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
-  const [editingEvent, setEditingEvent] = useState(null);
+    const workspace = (usePage().props as any).workspace;
+    const eventId = workspace?.event?.id || null;
+    const organizationSlug = workspace?.organization?.slug || '';
+    const eventSlug = workspace?.event?.slug || '';
+    const canUpdate = Boolean(
+        workspace?.permissions?.includes('*') ||
+        workspace?.permissions?.includes('schedule.update'),
+    );
+    const queryClient = useQueryClient();
+    const [showForm, setShowForm] = useState(false);
+    const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
 
-  const { data: events = [] } = useQuery({
-    queryKey: ['timeline', activeWeddingId],
-    queryFn: () => base44.entities.TimelineEvent.filter({ wedding_id: activeWeddingId }),
-    enabled: !!activeWeddingId,
-  });
+    const scheduleQuery = useQuery({
+        queryKey: ['tenant-schedule', eventId],
+        queryFn: () => tenantSchedule.get(organizationSlug, eventSlug),
+        enabled: Boolean(eventId),
+    });
+    const schedule = scheduleQuery.data?.data;
+    const items = schedule?.items || [];
 
-  const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.TimelineEvent.create({ ...data, wedding_id: activeWeddingId }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['timeline', activeWeddingId] }); setShowForm(false); }
-  });
+    const refresh = () =>
+        queryClient.invalidateQueries({
+            queryKey: ['tenant-schedule', eventId],
+        });
+    const createMutation = useMutation({
+        mutationFn: (data: ScheduleItemPayload) =>
+            tenantSchedule.create(organizationSlug, eventSlug, data),
+        onSuccess: () => {
+            refresh();
+            setShowForm(false);
+        },
+    });
+    const updateMutation = useMutation({
+        mutationFn: ({
+            id,
+            data,
+        }: {
+            id: string;
+            data: ScheduleItemPayload;
+        }) =>
+            tenantSchedule.update(
+                organizationSlug,
+                eventSlug,
+                id,
+                data,
+            ),
+        onSuccess: () => {
+            refresh();
+            setShowForm(false);
+            setEditingItem(null);
+        },
+    });
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) =>
+            tenantSchedule.delete(organizationSlug, eventSlug, id),
+        onSuccess: refresh,
+    });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.TimelineEvent.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['timeline', activeWeddingId] }); setShowForm(false); setEditingEvent(null); }
-  });
+    const groupedItems = useMemo(() => {
+        const groups = new Map<string, ScheduleItem[]>();
+        items.forEach((item) => {
+            const key = item.starts_at
+                ? item.starts_at.slice(0, 10)
+                : 'date-inconnue';
+            groups.set(key, [...(groups.get(key) || []), item]);
+        });
+        return [...groups.entries()];
+    }, [items]);
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.TimelineEvent.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['timeline', activeWeddingId] }),
-  });
+    const handleSave = (data: ScheduleItemPayload) => {
+        if (editingItem) {
+            updateMutation.mutate({ id: editingItem.id, data });
+        } else {
+            createMutation.mutate(data);
+        }
+    };
 
-  const handleSave = (formData) => {
-    if (editingEvent) updateMutation.mutate({ id: editingEvent.id, data: formData });
-    else createMutation.mutate(formData);
-  };
+    if (!workspace) {
+        return (
+            <EmptyState
+                icon={CalendarDays}
+                title="Choisissez un événement"
+                description="Activez un espace Planivo avant de construire son programme."
+                actionLabel="Choisir un événement"
+                onAction={() => window.location.assign('/onboarding')}
+            />
+        );
+    }
 
-  const sorted = [...events].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    if (scheduleQuery.isError) {
+        return (
+            <EmptyState
+                icon={CalendarDays}
+                title="Module non disponible"
+                description="Activez le module Programme pour cet événement."
+                actionLabel="Voir l’espace de travail"
+                onAction={() => window.location.assign('/workspace')}
+            />
+        );
+    }
 
-  return (
-    <div>
-      <PageHeader title="Programme" subtitle={`${events.length} événements`}>
-        <WeddingSelector weddings={weddings} activeWeddingId={activeWeddingId} onSelect={setActiveWeddingId} />
-        <Button onClick={() => { setEditingEvent(null); setShowForm(true); }}>
-          <Plus className="w-4 h-4 mr-1" /> Ajouter
-        </Button>
-      </PageHeader>
+    const summary = schedule?.summary || {
+        total: 0,
+        upcoming: 0,
+        in_progress: 0,
+        completed: 0,
+        public: 0,
+    };
 
-      {sorted.length === 0 ? (
-        <EmptyState icon={Clock} title="Aucun événement" description="Planifiez le programme de votre journée" actionLabel="Créer un événement" onAction={() => setShowForm(true)} />
-      ) : (
-        <div className="relative">
-          <div className="absolute bottom-0 left-5 top-0 w-0.5 bg-border sm:left-6" />
-          <div className="space-y-4">
-            {sorted.map((evt, i) => (
-              <div key={evt.id} className="relative flex gap-3 sm:gap-4 sm:pl-2">
-                <div className={cn(
-                  "relative z-10 w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 border-2",
-                  evt.status === 'completed' ? 'bg-green-50 border-green-300' :
-                  evt.status === 'in_progress' ? 'bg-primary/10 border-primary' :
-                  'bg-card border-border'
-                )}>
-                  {categoryIcons[evt.category] || '📋'}
-                </div>
-                <Card className="min-w-0 flex-1 p-4 transition-shadow hover:shadow-md">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-sm font-semibold text-primary">{evt.time}</span>
-                        <StatusBadge status={evt.status} />
-                      </div>
-                      <h3 className="font-display font-semibold">{evt.title}</h3>
-                      {evt.description && <p className="text-sm text-muted-foreground mt-1">{evt.description}</p>}
-                      {evt.sub_details?.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {evt.sub_details.map((detail, index) => (
-                            <span key={`${evt.id}-${index}`} className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                              {detail}
-                            </span>
-                          ))}
+    return (
+        <div>
+            <PageHeader
+                title="Programme & déroulé"
+                subtitle={`${workspace.event.name} · ${summary.total} activités`}
+            >
+                <Button variant="outline" asChild>
+                    <Link href="/onboarding">Changer d’événement</Link>
+                </Button>
+                {canUpdate && (
+                    <Button
+                        onClick={() => {
+                            setEditingItem(null);
+                            setShowForm(true);
+                        }}
+                    >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Ajouter une activité
+                    </Button>
+                )}
+            </PageHeader>
+
+            <div className="mb-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                    {
+                        label: 'À venir',
+                        value: summary.upcoming,
+                        icon: Clock,
+                        color: 'text-blue-700 bg-blue-50',
+                    },
+                    {
+                        label: 'En cours',
+                        value: summary.in_progress,
+                        icon: Play,
+                        color: 'text-amber-700 bg-amber-50',
+                    },
+                    {
+                        label: 'Terminées',
+                        value: summary.completed,
+                        icon: CheckCircle2,
+                        color: 'text-emerald-700 bg-emerald-50',
+                    },
+                    {
+                        label: 'Visibles aux invités',
+                        value: summary.public,
+                        icon: Eye,
+                        color: 'text-violet-700 bg-violet-50',
+                    },
+                ].map(({ label, value, icon: Icon, color }) => (
+                    <Card key={label} className="p-4">
+                        <div className="flex items-center gap-3">
+                            <div className={cn('rounded-xl p-2', color)}>
+                                <Icon className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">
+                                    {label}
+                                </p>
+                                <p className="text-2xl font-semibold">{value}</p>
+                            </div>
                         </div>
-                      )}
-                      {evt.image_url && (
-                        <img src={evt.image_url} alt="" className="mt-3 aspect-[16/7] w-full rounded-lg object-cover" />
-                      )}
-                    </div>
-                    <div className="flex shrink-0 flex-wrap gap-1">
-                      {evt.status === 'upcoming' && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateMutation.mutate({ id: evt.id, data: { status: 'in_progress' } })}>
-                          <Play className="w-3.5 h-3.5 text-primary" />
-                        </Button>
-                      )}
-                      {evt.status === 'in_progress' && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateMutation.mutate({ id: evt.id, data: { status: 'completed' } })}>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingEvent(evt); setShowForm(true); }}>
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteMutation.mutate(evt.id)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+                    </Card>
+                ))}
+            </div>
 
-      <EventFormDialog open={showForm} onOpenChange={setShowForm} event={editingEvent} onSave={handleSave} />
-    </div>
-  );
+            {scheduleQuery.isLoading ? (
+                <Card className="p-10 text-center text-sm text-muted-foreground">
+                    Chargement du programme…
+                </Card>
+            ) : items.length === 0 ? (
+                <EmptyState
+                    icon={CalendarDays}
+                    title="Programme vide"
+                    description="Ajoutez les temps forts, les consignes et les responsables de l’événement."
+                    actionLabel={canUpdate ? 'Créer une activité' : undefined}
+                    onAction={
+                        canUpdate
+                            ? () => {
+                                  setEditingItem(null);
+                                  setShowForm(true);
+                              }
+                            : undefined
+                    }
+                />
+            ) : (
+                <div className="space-y-8">
+                    {groupedItems.map(([date, dayItems]) => (
+                        <section key={date}>
+                            <div className="mb-4 flex items-center gap-3">
+                                <CalendarDays className="h-5 w-5 text-primary" />
+                                <h2 className="font-display text-lg font-semibold capitalize">
+                                    {date === 'date-inconnue'
+                                        ? 'Date à définir'
+                                        : format(
+                                              new Date(`${date}T12:00:00`),
+                                              'EEEE d MMMM yyyy',
+                                              { locale: fr },
+                                          )}
+                                </h2>
+                                <Badge variant="outline">
+                                    {dayItems.length} activité
+                                    {dayItems.length > 1 ? 's' : ''}
+                                </Badge>
+                            </div>
+                            <div className="relative">
+                                <div className="absolute bottom-0 left-5 top-0 w-px bg-border sm:left-6" />
+                                <div className="space-y-4">
+                                    {dayItems.map((item) => {
+                                        const category =
+                                            categories[item.category] ||
+                                            categories.other;
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                className="relative flex gap-3 sm:gap-4 sm:pl-2"
+                                            >
+                                                <div
+                                                    className={cn(
+                                                        'relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 text-base sm:h-12 sm:w-12',
+                                                        item.status === 'completed'
+                                                            ? 'border-emerald-300 bg-emerald-50'
+                                                            : item.status ===
+                                                                'in_progress'
+                                                              ? 'border-primary bg-primary/10'
+                                                              : 'border-border bg-card',
+                                                    )}
+                                                >
+                                                    {category.icon}
+                                                </div>
+                                                <Card className="min-w-0 flex-1 overflow-hidden p-4 transition-shadow hover:shadow-md">
+                                                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                                        <div className="min-w-0">
+                                                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                                                                <span className="font-mono text-sm font-semibold text-primary">
+                                                                    {item.starts_at
+                                                                        ? format(
+                                                                              new Date(
+                                                                                  item.starts_at,
+                                                                              ),
+                                                                              'HH:mm',
+                                                                          )
+                                                                        : item.time}
+                                                                    {item.ends_at &&
+                                                                        `–${format(new Date(item.ends_at), 'HH:mm')}`}
+                                                                </span>
+                                                                <StatusBadge
+                                                                    status={
+                                                                        item.status
+                                                                    }
+                                                                />
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="gap-1"
+                                                                >
+                                                                    {item.visibility ===
+                                                                    'public' ? (
+                                                                        <Eye className="h-3 w-3" />
+                                                                    ) : (
+                                                                        <EyeOff className="h-3 w-3" />
+                                                                    )}
+                                                                    {item.visibility ===
+                                                                    'public'
+                                                                        ? 'Public'
+                                                                        : 'Interne'}
+                                                                </Badge>
+                                                            </div>
+                                                            <h3 className="font-display text-lg font-semibold">
+                                                                {item.title}
+                                                            </h3>
+                                                            <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                                                                {category.label}
+                                                            </p>
+                                                            {item.description && (
+                                                                <p className="mt-2 text-sm text-muted-foreground">
+                                                                    {
+                                                                        item.description
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                            {(item.location ||
+                                                                item.responsible_name) && (
+                                                                <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                                                    {item.location && (
+                                                                        <span className="flex items-center gap-1">
+                                                                            <MapPin className="h-3.5 w-3.5" />
+                                                                            {
+                                                                                item.location
+                                                                            }
+                                                                        </span>
+                                                                    )}
+                                                                    {item.responsible_name && (
+                                                                        <span className="flex items-center gap-1">
+                                                                            <UserRound className="h-3.5 w-3.5" />
+                                                                            {
+                                                                                item.responsible_name
+                                                                            }
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {item.sub_details.length >
+                                                                0 && (
+                                                                <div className="mt-3 flex flex-wrap gap-1.5">
+                                                                    {item.sub_details.map(
+                                                                        (
+                                                                            detail,
+                                                                            index,
+                                                                        ) => (
+                                                                            <span
+                                                                                key={`${item.id}-${index}`}
+                                                                                className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
+                                                                            >
+                                                                                {
+                                                                                    detail
+                                                                                }
+                                                                            </span>
+                                                                        ),
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {item.image_url && (
+                                                                <img
+                                                                    src={
+                                                                        item.image_url
+                                                                    }
+                                                                    alt=""
+                                                                    className="mt-4 aspect-[16/6] w-full rounded-xl object-cover"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                        {canUpdate && (
+                                                            <div className="flex shrink-0 flex-wrap gap-1">
+                                                                {item.status ===
+                                                                    'upcoming' && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            updateMutation.mutate(
+                                                                                {
+                                                                                    id: item.id,
+                                                                                    data: {
+                                                                                        status: 'in_progress',
+                                                                                    },
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Play className="mr-1.5 h-3.5 w-3.5" />
+                                                                        Démarrer
+                                                                    </Button>
+                                                                )}
+                                                                {item.status ===
+                                                                    'in_progress' && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            updateMutation.mutate(
+                                                                                {
+                                                                                    id: item.id,
+                                                                                    data: {
+                                                                                        status: 'completed',
+                                                                                    },
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+                                                                        Terminer
+                                                                    </Button>
+                                                                )}
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() => {
+                                                                        setEditingItem(
+                                                                            item,
+                                                                        );
+                                                                        setShowForm(
+                                                                            true,
+                                                                        );
+                                                                    }}
+                                                                    aria-label={`Modifier ${item.title}`}
+                                                                >
+                                                                    <Pencil className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="text-destructive"
+                                                                    onClick={() => {
+                                                                        if (
+                                                                            window.confirm(
+                                                                                `Supprimer « ${item.title} » ?`,
+                                                                            )
+                                                                        ) {
+                                                                            deleteMutation.mutate(
+                                                                                item.id,
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                    aria-label={`Supprimer ${item.title}`}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </Card>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </section>
+                    ))}
+                </div>
+            )}
+
+            <ScheduleFormDialog
+                open={showForm}
+                item={editingItem}
+                defaultStart={workspace.event.starts_at}
+                pending={createMutation.isPending || updateMutation.isPending}
+                onOpenChange={(open) => {
+                    setShowForm(open);
+                    if (!open) setEditingItem(null);
+                }}
+                onSave={handleSave}
+            />
+        </div>
+    );
 }

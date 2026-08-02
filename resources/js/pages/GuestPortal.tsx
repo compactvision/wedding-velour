@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { CheckCircle2, XCircle, UtensilsCrossed, Send, MapPin, CalendarDays, Clock } from 'lucide-react';
+import { Bell, CheckCircle2, XCircle, UtensilsCrossed, Send, MapPin, CalendarDays, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -35,6 +35,7 @@ export default function GuestPortal() {
         setWedding(data.wedding);
         setPublicTimeline(data.timeline || []);
         setPublicOrders(data.orders || []);
+        setAnnouncements(data.announcements || []);
       } catch {
         setGuest(null);
       }
@@ -45,6 +46,7 @@ export default function GuestPortal() {
 
   const [publicTimeline, setPublicTimeline] = useState([]);
   const [publicOrders, setPublicOrders] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
 
   const timeline = publicTimeline;
   const myOrders = publicOrders;
@@ -117,6 +119,25 @@ export default function GuestPortal() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 pb-12 space-y-6">
+        {announcements.length > 0 && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="font-display text-lg flex items-center gap-2">
+                <Bell className="w-5 h-5 text-primary" />
+                Annonces
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {announcements.map((announcement: any) => (
+                <div key={announcement.id} className="border-b border-primary/10 pb-3 last:border-0 last:pb-0">
+                  <p className="text-sm font-semibold">{announcement.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{announcement.message}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* RSVP */}
         {(guest.status === 'invited') && (
           <Card>

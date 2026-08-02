@@ -11,14 +11,14 @@ class AdminUserSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_database_seeder_creates_only_the_admin_user(): void
+    public function test_database_seeder_creates_only_the_superadmin_user(): void
     {
         $this->seed(DatabaseSeeder::class);
 
         $this->assertDatabaseCount('users', 1);
         $this->assertDatabaseHas('users', [
             'email' => 'admin@weddingvelour.com',
-            'role' => 'admin',
+            'role' => 'superadmin',
             'wedding_id' => null,
             'is_active' => true,
         ]);

@@ -9,14 +9,14 @@ type BrandLogoProps = {
 export default function BrandLogo({
     variant = 'mark',
     className,
-    alt = 'Wedding Velour',
+    alt = 'Planivo',
 }: BrandLogoProps) {
     return (
         <img
             src={
                 variant === 'full'
-                    ? '/assets/images/logo.png'
-                    : '/assets/images/logo-without-brand.png'
+                    ? '/assets/images/planivo-logo.png'
+                    : '/assets/images/planivo-mark.png'
             }
             alt={alt}
             className={cn('object-contain', className)}

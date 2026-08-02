@@ -44,8 +44,7 @@ export default function ServiceWorkerUpdateToast() {
                         Nouvelle version disponible
                     </p>
                     <p className="mt-1 text-xs leading-5 text-stone-500">
-                        Rechargez pour utiliser la dernière version de Wedding
-                        Velour.
+                        Rechargez pour utiliser la dernière version de Planivo.
                     </p>
                     <div className="mt-3 flex gap-2">
                         <Button size="sm" onClick={activateUpdate}>
