@@ -1,11 +1,18 @@
 import { Link, usePage } from '@inertiajs/react';
-import { LayoutDashboard, LogOut, Settings2, ShieldCheck } from 'lucide-react';
+import {
+    LayoutDashboard,
+    LogOut,
+    Settings2,
+    ShieldCheck,
+    Users,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import BrandLogo from '@/components/shared/BrandLogo';
 import { cn } from '@/lib/utils';
 
 const items = [
     { href: '/superadmin', label: 'Vue plateforme', icon: LayoutDashboard },
+    { href: '/superadmin/users', label: 'Utilisateurs', icon: Users },
     {
         href: '/settings/pricing',
         label: 'Plans & tarification',
@@ -50,10 +57,7 @@ export default function SuperAdminLayout({
                             className={cn(
                                 'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition',
                                 url.startsWith(href) &&
-                                    !(
-                                        href === '/superadmin' &&
-                                        url !== '/superadmin'
-                                    )
+                                    !(href === '/superadmin' && url !== href)
                                     ? 'bg-amber-400 text-stone-950'
                                     : 'text-white/60 hover:bg-white/8 hover:text-white',
                             )}

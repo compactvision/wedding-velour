@@ -65,6 +65,7 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware(['auth', 'role:superadmin'])->group(function () {
     Route::get('/superadmin', [PlatformAdminController::class, 'index'])->name('superadmin.dashboard');
+    Route::get('/superadmin/users', [PlatformAdminController::class, 'users'])->name('superadmin.users');
     Route::patch('/superadmin/users/{user}', [PlatformAdminController::class, 'updateUser'])->name('superadmin.users.update');
     Route::get('/settings/pricing', [PlatformPricingController::class, 'show'])->name('pricing-settings');
     Route::put('/settings/pricing', [PlatformPricingController::class, 'update'])->name('pricing-settings.update');

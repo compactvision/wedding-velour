@@ -96,6 +96,53 @@ class PlatformAdminController extends Controller
         ]);
     }
 
+    public function users(Request $request): Response
+    {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'role' => ['nullable', Rule::in(['superadmin', 'admin', 'manager', 'server', 'door'])],
+            'status' => ['nullable', Rule::in(['active', 'suspended'])],
+        ]);
+
+        $search = trim($filters['search'] ?? '');
+
+        $users = User::query()
+            ->withCount('ownedOrganizations')
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            }))
+            ->when($filters['role'] ?? null, fn ($query, $role) => $query->where('role', $role))
+            ->when(
+                $filters['status'] ?? null,
+                fn ($query, $status) => $query->where('is_active', $status === 'active'),
+            )
+            ->latest()
+            ->paginate(20)
+            ->withQueryString()
+            ->through(fn (User $user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'status' => $user->status,
+                'is_active' => $user->is_active,
+                'email_verified_at' => $user->email_verified_at?->toIso8601String(),
+                'created_at' => $user->created_at?->toIso8601String(),
+                'organizations_count' => $user->owned_organizations_count,
+                'is_protected' => $user->isSuperAdmin(),
+            ]);
+
+        return Inertia::render('SuperAdminUsers', [
+            'users' => $users,
+            'filters' => [
+                'search' => $search,
+                'role' => $filters['role'] ?? '',
+                'status' => $filters['status'] ?? '',
+            ],
+        ]);
+    }
+
     public function updateUser(Request $request, User $user): RedirectResponse
     {
         abort_if($user->isSuperAdmin(), 403, 'Le compte superadmin ne peut pas être modifié ici.');

@@ -145,7 +145,11 @@ if (!isBrowser || !appElement) {
 
             const page: any = await resolvePage();
             const component = page.default;
-            const superAdminPages = ['SuperAdminDashboard', 'PricingSettings'];
+            const superAdminPages = [
+                'SuperAdminDashboard',
+                'SuperAdminUsers',
+                'PricingSettings',
+            ];
 
             const nonAdminPages = [
                 'welcome',
