@@ -90,7 +90,7 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
     Route::get('/superadmin/transactions', [PlatformTransactionController::class, 'index'])->name('superadmin.transactions');
     Route::get('/superadmin/transactions/{payment}/receipt', [PlatformTransactionController::class, 'receipt'])->name('superadmin.transactions.receipt');
     Route::patch('/superadmin/users/{user}', [PlatformAdminController::class, 'updateUser'])->name('superadmin.users.update');
-    Route::patch('/superadmin/event-types/{eventType}', [PlatformAdminController::class, 'updateEventType'])->name('superadmin.event-types.update');
+    Route::post('/superadmin/event-types/{eventType}/status', [PlatformAdminController::class, 'updateEventType'])->name('superadmin.event-types.update');
     Route::get('/settings/pricing', [PlatformPricingController::class, 'show'])->name('pricing-settings');
     Route::put('/settings/pricing', [PlatformPricingController::class, 'update'])->name('pricing-settings.update');
 });

@@ -156,7 +156,7 @@ class PlatformAdminTest extends TestCase
                 ->where('eventTypes.0.slug', 'wedding'));
 
         $this->actingAs($superadmin)
-            ->patch("/superadmin/event-types/{$wedding->id}", [
+            ->post("/superadmin/event-types/{$wedding->id}/status", [
                 'is_active' => false,
             ])
             ->assertRedirect()
@@ -183,14 +183,14 @@ class PlatformAdminTest extends TestCase
             ->assertJsonValidationErrors('event_type_id');
 
         $this->actingAs($superadmin)
-            ->patch("/superadmin/event-types/{$wedding->id}", [
+            ->post("/superadmin/event-types/{$wedding->id}/status", [
                 'is_active' => true,
             ])
             ->assertRedirect();
         $this->assertSame('active', $wedding->fresh()->status);
 
         $this->actingAs($organizer)
-            ->patch("/superadmin/event-types/{$wedding->id}", [
+            ->post("/superadmin/event-types/{$wedding->id}/status", [
                 'is_active' => false,
             ])
             ->assertForbidden();

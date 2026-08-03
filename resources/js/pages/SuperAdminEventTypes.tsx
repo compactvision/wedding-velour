@@ -48,8 +48,8 @@ export default function SuperAdminEventTypes({
 
     const toggle = (eventType: EventType, isActive: boolean) => {
         setProcessingId(eventType.id);
-        router.patch(
-            `/superadmin/event-types/${eventType.id}`,
+        router.post(
+            `/superadmin/event-types/${eventType.id}/status`,
             { is_active: isActive },
             {
                 preserveScroll: true,
