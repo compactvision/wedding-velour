@@ -1,10 +1,12 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     LayoutDashboard,
+    CalendarRange,
     LogOut,
     Settings2,
     ShieldCheck,
     Users,
+    ReceiptText,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import BrandLogo from '@/components/shared/BrandLogo';
@@ -13,6 +15,16 @@ import { cn } from '@/lib/utils';
 const items = [
     { href: '/superadmin', label: 'Vue plateforme', icon: LayoutDashboard },
     { href: '/superadmin/users', label: 'Utilisateurs', icon: Users },
+    {
+        href: '/superadmin/event-types',
+        label: 'Types d’événements',
+        icon: CalendarRange,
+    },
+    {
+        href: '/superadmin/transactions',
+        label: 'Transactions',
+        icon: ReceiptText,
+    },
     {
         href: '/settings/pricing',
         label: 'Plans & tarification',

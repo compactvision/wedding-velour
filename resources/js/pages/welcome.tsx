@@ -59,6 +59,8 @@ type PublicPlan = {
     billing_model: string;
     currency: string;
     base_price_minor: number;
+    guest_price_minor: number;
+    module_price_minor: number;
     limits: {
         max_guests?: number;
         max_users?: number;
@@ -104,9 +106,18 @@ const planFeatures = (plan: PublicPlan) => {
 
     if (plan.limits.max_modules) {
         features.push(
-            `${plan.limits.max_modules.toLocaleString('fr-FR')} modules inclus`,
+            `${plan.limits.max_modules.toLocaleString('fr-FR')} modules disponibles`,
         );
     }
+
+    const unitPrice = (amountMinor: number) =>
+        new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: plan.currency || 'USD',
+            maximumFractionDigits: amountMinor % 100 === 0 ? 0 : 2,
+        }).format(amountMinor / 100);
+    features.push(`${unitPrice(plan.guest_price_minor)} par invité`);
+    features.push(`${unitPrice(plan.module_price_minor)} par module activé`);
 
     if (plan.limits.storage_gb) {
         features.push(
@@ -411,6 +422,13 @@ export default function Welcome({ plans }: { plans: PublicPlan[] }) {
                                         <div className="mt-5 text-4xl font-bold">
                                             {formatPrice(plan)}
                                         </div>
+                                        {plan.billing_model !==
+                                            'enterprise' && (
+                                            <p className="mt-1 text-xs text-stone-400">
+                                                prix du pack, hors invités et
+                                                modules
+                                            </p>
+                                        )}
                                         <p
                                             className={`mt-3 ${plan.slug === 'standard' ? 'text-amber-50' : 'text-stone-400'}`}
                                         >

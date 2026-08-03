@@ -8,6 +8,7 @@ use App\Models\EventType;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -33,7 +34,7 @@ class OnboardingProvisioningTest extends TestCase
                 ->has('eventTypes.0.modules'));
     }
 
-    public function test_onboarding_provisions_a_complete_tenant_and_activates_it(): void
+    public function test_onboarding_provisions_a_tenant_and_opens_payment_before_activation(): void
     {
         $user = User::factory()->create([
             'role' => 'admin',
@@ -63,28 +64,52 @@ class OnboardingProvisioningTest extends TestCase
             'estimated_guests' => 450,
             'modules' => ['ticketing', 'badges', 'analytics'],
         ];
-        $payload['pricing_signature'] = $this->actingAs($user)->postJson('/onboarding/quote', [
+        $preview = $this->actingAs($user)->postJson('/onboarding/quote', [
             'event_type_id' => $conference->id,
             'estimated_guests' => 450,
             'modules' => $payload['modules'],
         ])->assertOk()
             ->assertJsonPath('data.metrics.estimated_guests', 450)
-            ->json('data.signature');
+            ->json('data');
+        $payload['pricing_signature'] = $preview['signature'];
+        $payload['idempotency_key'] = 'onboarding-payment-key-001';
+        config()->set('payments.default_provider', 'rdcard');
+        config()->set('payments.rdcard.environment', 'sandbox');
+        config()->set('payments.rdcard.base_url', null);
+        config()->set('payments.rdcard.api_key', 'rdcard-onboarding-key');
+        config()->set('payments.rdcard.secret', 'rdcard-onboarding-secret');
+        Http::fake([
+            'https://sandbox.checkout.rdcard.net/api/v1/sessions' => Http::response([
+                'id' => 'sess_onboarding_001',
+                'checkoutUrl' => 'https://sandbox.checkout.rdcard.net/pay/sess_onboarding_001',
+                'amount' => $preview['total_minor'] / 100,
+                'currency' => $preview['currency'],
+            ]),
+        ]);
         $this->assertDatabaseCount('events', 0);
 
-        $response = $this->actingAs($user)->post('/onboarding', $payload);
+        $response = $this->actingAs($user)->postJson('/onboarding', $payload);
 
         $organization = Organization::query()->where('slug', 'studio-kivu')->firstOrFail();
         $event = Event::query()->where('organization_id', $organization->id)->firstOrFail();
 
         $response
-            ->assertRedirect(route('workspace'))
+            ->assertCreated()
+            ->assertJsonPath('data.event_id', $event->id)
+            ->assertJsonPath('data.checkout_url', 'https://sandbox.checkout.rdcard.net/pay/sess_onboarding_001')
             ->assertSessionHas('active_organization_id', $organization->id)
             ->assertSessionHas('active_event_id', $event->id);
 
         $this->assertEquals($user->id, $organization->owner_user_id);
         $this->assertSame('conference', $event->type->slug);
+        $this->assertSame('pending_payment', $event->status);
         $this->assertSame(450, $event->estimated_guests);
+        $this->assertDatabaseHas('payments', [
+            'event_id' => $event->id,
+            'amount_minor' => $preview['total_minor'],
+            'status' => 'pending',
+            'provider' => 'rdcard',
+        ]);
         $this->assertDatabaseHas('organization_members', [
             'organization_id' => $organization->id,
             'user_id' => $user->id,
@@ -112,12 +137,11 @@ class OnboardingProvisioningTest extends TestCase
                 'active_event_id' => $event->id,
             ])
             ->get('/workspace')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Workspace')
-                ->where('organization.id', $organization->id)
-                ->where('event.id', $event->id)
-                ->has('event.modules'));
+            ->assertRedirect(route('transactions'));
+
+        $this->actingAs($user)
+            ->getJson("/api/organizations/{$organization->slug}/events/{$event->slug}/guests")
+            ->assertStatus(402);
     }
 
     public function test_quote_is_shown_before_creation_and_changes_with_guests_and_modules(): void
@@ -204,8 +228,9 @@ class OnboardingProvisioningTest extends TestCase
             'estimated_guests' => 10,
             'modules' => [],
         ])->assertOk()->json('data.signature');
+        $payload['idempotency_key'] = 'forbidden-onboarding-key-001';
 
-        $this->actingAs($outsider)->post('/onboarding', $payload)->assertNotFound();
+        $this->actingAs($outsider)->postJson('/onboarding', $payload)->assertNotFound();
         $this->actingAs($outsider)->post('/workspace/select', [
             'organization_id' => $organization->id,
             'event_id' => $event->id,

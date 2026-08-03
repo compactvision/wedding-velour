@@ -14,12 +14,14 @@ use App\Infrastructure\Persistence\Eloquent\WeddingTableModel;
 use App\Models\Event;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class PublicWeddingController extends Controller
 {
     public function invitation(
+        Request $request,
         string $token,
         InvitationSettingsService $invitations,
     ): JsonResponse {
@@ -27,7 +29,17 @@ class PublicWeddingController extends Controller
             ->where('invitation_link', $token)
             ->with(['event.settings'])
             ->firstOrFail();
-        $event = $guest->event;
+
+        if ($this->requiresIdentityVerification($guest)
+            && ! $this->hasInvitationAccess($request, $guest)) {
+            return response()->json([
+                'requires_verification' => true,
+                'verification_channel' => $this->verificationChannel($guest),
+                'masked_destination' => $this->maskedDestination($guest),
+            ]);
+        }
+
+        $event = $guest->event?->loadMissing('type');
         $menuItems = MenuItemModel::query()
             ->when(
                 $guest->event_id,
@@ -67,6 +79,12 @@ class PublicWeddingController extends Controller
                 $invitationSubject->setAttribute('venue', null);
                 $invitationSubject->setAttribute('venue_address', null);
             }
+        }
+
+        if ($invitationSubject instanceof WeddingModel) {
+            $invitationSubject->setAttribute('event_type_slug', $event?->type?->slug ?? 'wedding');
+        } else {
+            $invitationSubject['event_type_slug'] = $event?->type?->slug;
         }
 
         return response()->json([
@@ -114,6 +132,30 @@ class PublicWeddingController extends Controller
         ]);
     }
 
+    public function verifyInvitation(Request $request, string $token): JsonResponse
+    {
+        $guest = GuestModel::query()
+            ->where('invitation_link', $token)
+            ->firstOrFail();
+        $data = $request->validate([
+            'identity' => ['required', 'string', 'max:190'],
+        ]);
+
+        abort_unless($this->identityMatches($guest, $data['identity']), 422,
+            'Ces informations ne correspondent pas à cette invitation.');
+
+        $accessToken = Crypt::encryptString(json_encode([
+            'guest_id' => $guest->id,
+            'invitation' => hash('sha256', (string) $guest->invitation_link),
+            'expires_at' => now()->addMonths(12)->timestamp,
+        ], JSON_THROW_ON_ERROR));
+
+        return response()->json([
+            'access_token' => $accessToken,
+            'message' => 'Identité confirmée.',
+        ]);
+    }
+
     public function respond(
         Request $request,
         string $token,
@@ -123,6 +165,7 @@ class PublicWeddingController extends Controller
             ->where('invitation_link', $token)
             ->with('event')
             ->firstOrFail();
+        $this->authorizeInvitationRequest($request, $guest);
         $data = $request->validate([
             'status' => ['required', 'in:attending,confirmed,declined'],
             'rsvp_message' => ['nullable', 'string', 'max:2000'],
@@ -161,6 +204,7 @@ class PublicWeddingController extends Controller
     public function invitationOrder(Request $request, string $token): JsonResponse
     {
         $guest = GuestModel::where('invitation_link', $token)->firstOrFail();
+        $this->authorizeInvitationRequest($request, $guest);
         $data = $request->validate([
             'type' => ['required', 'in:drink,food,dessert,special_request'],
             'description' => ['required', 'string', 'max:500'],
@@ -273,6 +317,75 @@ class PublicWeddingController extends Controller
         ];
     }
 
+    private function authorizeInvitationRequest(Request $request, GuestModel $guest): void
+    {
+        abort_if(
+            $this->requiresIdentityVerification($guest)
+                && ! $this->hasInvitationAccess($request, $guest),
+            403,
+            'Cette invitation doit d’abord être déverrouillée.',
+        );
+    }
+
+    private function requiresIdentityVerification(GuestModel $guest): bool
+    {
+        return filled($guest->email) || filled($guest->phone);
+    }
+
+    private function hasInvitationAccess(Request $request, GuestModel $guest): bool
+    {
+        $token = $request->header('X-Invitation-Access');
+        if (! is_string($token) || $token === '') {
+            return false;
+        }
+
+        try {
+            $payload = json_decode(Crypt::decryptString($token), true, flags: JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return ($payload['guest_id'] ?? null) === $guest->id
+            && ($payload['invitation'] ?? null) === hash('sha256', (string) $guest->invitation_link)
+            && (int) ($payload['expires_at'] ?? 0) > now()->timestamp;
+    }
+
+    private function identityMatches(GuestModel $guest, string $identity): bool
+    {
+        $identity = trim($identity);
+        $emailMatches = filled($guest->email)
+            && hash_equals(mb_strtolower(trim((string) $guest->email)), mb_strtolower($identity));
+        $submittedPhone = preg_replace('/\D+/', '', $identity) ?? '';
+        $storedPhone = preg_replace('/\D+/', '', (string) $guest->phone) ?? '';
+        $phoneMatches = filled($guest->phone)
+            && $submittedPhone !== ''
+            && hash_equals($storedPhone, $submittedPhone);
+
+        return $emailMatches || $phoneMatches;
+    }
+
+    private function verificationChannel(GuestModel $guest): string
+    {
+        if (filled($guest->email) && filled($guest->phone)) {
+            return 'email_or_phone';
+        }
+
+        return filled($guest->email) ? 'email' : 'phone';
+    }
+
+    private function maskedDestination(GuestModel $guest): string
+    {
+        if (filled($guest->email)) {
+            [$name, $domain] = array_pad(explode('@', (string) $guest->email, 2), 2, '');
+
+            return mb_substr($name, 0, 1).'•••@'.$domain;
+        }
+
+        $phone = preg_replace('/\D+/', '', (string) $guest->phone) ?? '';
+
+        return '••••'.mb_substr($phone, -4);
+    }
+
     private function notifyNewOrder(OrderModel $order): void
     {
         WeddingNotificationModel::firstOrCreate(
@@ -315,6 +428,7 @@ class PublicWeddingController extends Controller
             'status' => $event->status,
             'max_guests' => $event->estimated_guests,
             'invitation_custom' => $configuration,
+            'event_type_slug' => $event->type?->slug,
         ];
     }
 }

@@ -52,6 +52,9 @@ export type InvitationConfiguration = {
     footer: string;
     background_image: string;
     accent_color: string;
+    couple_names: string;
+    couple_initials: string;
+    dress_code: string;
     rsvp_deadline: string | null;
     show_event_details: boolean;
 };
@@ -468,6 +471,7 @@ export type BillingPayment = {
     status: 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled';
     provider: string;
     external_reference: string;
+    checkout_url: string | null;
     paid_at: string | null;
     created_at: string;
 };
@@ -1163,7 +1167,6 @@ export const tenantBilling = {
             {
                 quote_id: quoteId,
                 idempotency_key: idempotencyKey,
-                provider: 'sandbox',
             },
         );
 

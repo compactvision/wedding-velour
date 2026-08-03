@@ -20,13 +20,17 @@ use App\Http\Controllers\Api\TenantScheduleController;
 use App\Http\Controllers\Api\TenantSeatingController;
 use App\Http\Controllers\Api\TenantTeamController;
 use App\Http\Controllers\Api\TenantTicketingController;
+use App\Http\Controllers\Api\TenantTransactionController;
 use App\Http\Controllers\Api\TenantVendorController;
 use App\Http\Controllers\Api\UploadController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('public')->group(function () {
-    Route::post('/payments/webhooks/{provider}', PaymentWebhookController::class);
+    Route::post('/payments/webhooks/{provider}', PaymentWebhookController::class)
+        ->middleware('throttle:120,1');
     Route::get('/invitations/{token}', [PublicWeddingController::class, 'invitation']);
+    Route::post('/invitations/{token}/verify', [PublicWeddingController::class, 'verifyInvitation'])
+        ->middleware('throttle:10,1');
     Route::put('/invitations/{token}', [PublicWeddingController::class, 'respond']);
     Route::post('/invitations/{token}/orders', [PublicWeddingController::class, 'invitationOrder']);
     Route::get('/table-menus/{table}', [PublicWeddingController::class, 'tableMenu']);
@@ -76,7 +80,10 @@ Route::middleware(['web', 'auth'])->group(function () {
         Route::put('/events/{event:slug}/team/members/{organizationMember}', [TenantTeamController::class, 'updateMember']);
         Route::get('/events/{event:slug}/billing', [TenantBillingController::class, 'index']);
         Route::post('/events/{event:slug}/billing/quotes', [TenantBillingController::class, 'quote']);
-        Route::post('/events/{event:slug}/billing/payments', [TenantBillingController::class, 'payment']);
+        Route::post('/events/{event:slug}/billing/payments', [TenantBillingController::class, 'payment'])
+            ->middleware('throttle:10,15');
+        Route::get('/events/{event:slug}/transactions', [TenantTransactionController::class, 'index']);
+        Route::get('/events/{event:slug}/transactions/{payment}/receipt', [TenantTransactionController::class, 'receipt']);
         Route::get('/events/{event:slug}/budget', [TenantBudgetController::class, 'index']);
         Route::post('/events/{event:slug}/budget/categories', [TenantBudgetController::class, 'storeCategory']);
         Route::put('/events/{event:slug}/budget/categories/{category}', [TenantBudgetController::class, 'updateCategory']);
@@ -108,6 +115,7 @@ Route::middleware(['web', 'auth'])->group(function () {
         Route::get('/events/{event:slug}/media', [TenantMediaController::class, 'index']);
         Route::post('/events/{event:slug}/media', [TenantMediaController::class, 'store']);
         Route::post('/events/{event:slug}/media/albums', [TenantMediaController::class, 'storeAlbum']);
+        Route::post('/events/{event:slug}/media/gallery-link', [TenantMediaController::class, 'galleryLink']);
         Route::put('/events/{event:slug}/media/{photo}', [TenantMediaController::class, 'update']);
         Route::get('/events/{event:slug}/media/{photo}/content', [TenantMediaController::class, 'content'])->name('tenant-media.content');
         Route::delete('/events/{event:slug}/media/{photo}', [TenantMediaController::class, 'destroy']);

@@ -14,7 +14,7 @@ type PricingPlan = {
     base_price_minor: number;
     max_guests: number;
     guest_price_minor: number;
-    included_modules: number;
+    max_modules: number;
     module_price_minor: number;
 };
 
@@ -36,7 +36,7 @@ export default function PricingSettings({ plans }: { plans: PricingPlan[] }) {
             | 'base_price'
             | 'max_guests'
             | 'guest_price'
-            | 'included_modules'
+            | 'max_modules'
             | 'module_price',
         value: number,
     ) =>
@@ -56,7 +56,7 @@ export default function PricingSettings({ plans }: { plans: PricingPlan[] }) {
                     base_price_minor: Math.round(plan.base_price * 100),
                     max_guests: plan.max_guests,
                     guest_price_minor: Math.round(plan.guest_price * 100),
-                    included_modules: plan.included_modules,
+                    max_modules: plan.max_modules,
                     module_price_minor: Math.round(plan.module_price * 100),
                 })),
             },
@@ -120,7 +120,7 @@ export default function PricingSettings({ plans }: { plans: PricingPlan[] }) {
                                 </div>
                                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                                     <div>
-                                        <Label>Invités inclus</Label>
+                                        <Label>Capacité maximale</Label>
                                         <Input
                                             type="number"
                                             min="1"
@@ -135,7 +135,7 @@ export default function PricingSettings({ plans }: { plans: PricingPlan[] }) {
                                         />
                                     </div>
                                     <div>
-                                        <Label>Prix par invité en plus</Label>
+                                        <Label>Prix par invité</Label>
                                         <Input
                                             type="number"
                                             min="0"
@@ -151,6 +151,9 @@ export default function PricingSettings({ plans }: { plans: PricingPlan[] }) {
                                         />
                                     </div>
                                 </div>
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                    Chaque invité est facturé, dès le premier.
+                                </p>
                             </div>
                             <div className="rounded-xl border p-4">
                                 <div className="mb-3 font-semibold">
@@ -158,22 +161,24 @@ export default function PricingSettings({ plans }: { plans: PricingPlan[] }) {
                                 </div>
                                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                                     <div>
-                                        <Label>Modules inclus</Label>
+                                        <Label>Modules autorisés</Label>
                                         <Input
                                             type="number"
                                             min="0"
-                                            value={plan.included_modules}
+                                            value={plan.max_modules}
                                             onChange={(event) =>
                                                 update(
                                                     plan.slug,
-                                                    'included_modules',
+                                                    'max_modules',
                                                     Number(event.target.value),
                                                 )
                                             }
                                         />
                                     </div>
                                     <div>
-                                        <Label>Prix par module en plus</Label>
+                                        <Label>
+                                            Prix par module sélectionné
+                                        </Label>
                                         <Input
                                             type="number"
                                             min="0"
@@ -189,6 +194,10 @@ export default function PricingSettings({ plans }: { plans: PricingPlan[] }) {
                                         />
                                     </div>
                                 </div>
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                    Chaque module activé est ajouté au prix du
+                                    pack.
+                                </p>
                             </div>
                         </CardContent>
                     </Card>

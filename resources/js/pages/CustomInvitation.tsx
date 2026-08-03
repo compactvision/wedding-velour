@@ -39,6 +39,9 @@ const fallbackInvitation: InvitationConfiguration = {
     footer: 'Merci et à très vite',
     background_image: '',
     accent_color: '#B98235',
+    couple_names: '',
+    couple_initials: '',
+    dress_code: '',
     rsvp_deadline: null,
     show_event_details: true,
 };
@@ -307,6 +310,46 @@ export default function CustomInvitation() {
 
                     <TabsContent value="visuel" className="mt-4">
                         <Card className="space-y-5 p-5">
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <Field label="Noms des mariés">
+                                    <Input
+                                        value={form.couple_names}
+                                        disabled={!canUpdate}
+                                        onChange={(event) =>
+                                            update(
+                                                'couple_names',
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Ex. Johan & Rose"
+                                    />
+                                </Field>
+                                <Field label="Initiales du sceau">
+                                    <Input
+                                        value={form.couple_initials}
+                                        disabled={!canUpdate}
+                                        maxLength={5}
+                                        onChange={(event) =>
+                                            update(
+                                                'couple_initials',
+                                                event.target.value.toUpperCase(),
+                                            )
+                                        }
+                                        placeholder="Ex. J&R"
+                                    />
+                                </Field>
+                            </div>
+                            <Field label="Dress code">
+                                <Textarea
+                                    rows={3}
+                                    value={form.dress_code}
+                                    disabled={!canUpdate}
+                                    onChange={(event) =>
+                                        update('dress_code', event.target.value)
+                                    }
+                                    placeholder="Ex. Tenue de soirée · Tons champagne et sauge"
+                                />
+                            </Field>
                             <Field label="Image de fond">
                                 <div className="mt-2 flex flex-col gap-3 sm:flex-row">
                                     <Input

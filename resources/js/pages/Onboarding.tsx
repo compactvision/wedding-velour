@@ -13,6 +13,7 @@ import {
     CalendarRange,
     Check,
     CheckCircle2,
+    CreditCard,
     Flower2,
     Heart,
     MapPin,
@@ -262,6 +263,11 @@ export default function Onboarding({
     const [pricing, setPricing] = useState<PricingPreview | null>(null);
     const [pricingLoading, setPricingLoading] = useState(false);
     const [pricingError, setPricingError] = useState('');
+    const [idempotencyKey] = useState(() =>
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `onboarding-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
     const [form, setForm] = useState({
         organization_mode: organizations.length > 0 ? 'existing' : 'new',
         organization_id: organizations[0]?.id || '',
@@ -358,7 +364,7 @@ export default function Onboarding({
         return true;
     };
 
-    const submit = (event: FormEvent) => {
+    const submit = async (event: FormEvent) => {
         event.preventDefault();
 
         if (step !== 5 || !pricing) {
@@ -366,18 +372,41 @@ export default function Onboarding({
         }
 
         setProcessing(true);
-        router.post(
-            '/onboarding',
-            {
+        setPricingError('');
+
+        try {
+            const response = await axios.post('/onboarding', {
                 ...form,
                 modules: selectedModules,
                 pricing_signature: pricing.signature,
-            },
-            {
-                preserveScroll: true,
-                onFinish: () => setProcessing(false),
-            },
-        );
+                idempotency_key: idempotencyKey,
+            });
+            const checkoutUrl = response.data?.data?.checkout_url;
+
+            if (typeof checkoutUrl !== 'string' || checkoutUrl.length === 0) {
+                throw new Error('Page de paiement indisponible.');
+            }
+
+            window.location.assign(checkoutUrl);
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const validationErrors = error.response?.data?.errors;
+                setPricingError(
+                    validationErrors
+                        ? Object.values(validationErrors).flat().join(' ')
+                        : error.response?.data?.message ||
+                              'Impossible d’ouvrir le paiement. Réessayez.',
+                );
+            } else {
+                setPricingError(
+                    error instanceof Error
+                        ? error.message
+                        : 'Impossible d’ouvrir le paiement. Réessayez.',
+                );
+            }
+        } finally {
+            setProcessing(false);
+        }
     };
 
     const requestPricing = async () => {
@@ -985,6 +1014,26 @@ export default function Onboarding({
                                                 title="Quel événement organisez-vous ?"
                                                 description="Ce choix adapte les recommandations, les champs et les modules."
                                             />
+                                            {eventTypes.length === 0 && (
+                                                <div className="mt-8 flex max-w-2xl gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+                                                    <CalendarRange className="mt-0.5 h-6 w-6 shrink-0 text-amber-700" />
+                                                    <div>
+                                                        <p className="font-semibold">
+                                                            Aucun type
+                                                            d’événement
+                                                            disponible
+                                                        </p>
+                                                        <p className="mt-1 text-sm leading-6">
+                                                            La création est
+                                                            temporairement
+                                                            suspendue. Contactez
+                                                            l’équipe Planivo
+                                                            pour obtenir de
+                                                            l’aide.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
                                             <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                                 {eventTypes.map((type) => {
                                                     const Icon =
@@ -1560,18 +1609,30 @@ export default function Onboarding({
                                         </Button>
                                     </div>
                                 ) : (
-                                    <Button
-                                        type="submit"
-                                        className="h-11 bg-[#b67d32] px-6 text-white hover:bg-[#9f6b29]"
-                                        disabled={processing}
-                                    >
-                                        {processing
-                                            ? 'Création en cours…'
-                                            : 'Confirmer et créer'}
-                                        {!processing && (
-                                            <CalendarCheck2 className="ml-2 h-4 w-4" />
+                                    <div className="text-right">
+                                        {pricingError && (
+                                            <p className="mb-2 max-w-md text-sm text-red-600">
+                                                {pricingError}
+                                            </p>
                                         )}
-                                    </Button>
+                                        <Button
+                                            type="submit"
+                                            className="h-11 bg-[#b67d32] px-6 text-white hover:bg-[#9f6b29]"
+                                            disabled={processing}
+                                        >
+                                            {processing ? (
+                                                <>
+                                                    <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                                                    Ouverture du paiement…
+                                                </>
+                                            ) : (
+                                                <>
+                                                    Continuer vers le paiement
+                                                    <CreditCard className="ml-2 h-4 w-4" />
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
                                 )}
                             </footer>
                         </section>

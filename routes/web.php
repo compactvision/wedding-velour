@@ -6,6 +6,8 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PlatformAdminController;
 use App\Http\Controllers\PlatformPricingController;
+use App\Http\Controllers\PlatformTransactionController;
+use App\Http\Controllers\PublicGalleryController;
 use App\Http\Controllers\TeamInvitationController;
 use App\Models\Plan;
 use Illuminate\Support\Facades\Route;
@@ -26,17 +28,26 @@ Route::get('/', function () {
             ->where('status', 'active')
             ->where(fn ($query) => $query->whereNull('valid_from')->orWhere('valid_from', '<=', $now))
             ->where(fn ($query) => $query->whereNull('valid_until')->orWhere('valid_until', '>=', $now))
+            ->with(['rules' => fn ($query) => $query->where('status', 'active')])
             ->orderBy('sort_order')
             ->get()
-            ->map(fn (Plan $plan) => [
-                'slug' => $plan->slug,
-                'name' => $plan->name,
-                'description' => $plan->description,
-                'billing_model' => $plan->billing_model,
-                'currency' => $plan->currency,
-                'base_price_minor' => $plan->base_price_minor,
-                'limits' => $plan->limits ?? [],
-            ]),
+            ->map(function (Plan $plan) {
+                $guestRule = $plan->rules->first(fn ($rule) => ($rule->condition['metric'] ?? null) === 'estimated_guests');
+                $moduleRule = $plan->rules->first(fn ($rule) => ($rule->condition['metric'] ?? null) === 'enabled_modules'
+                    && array_key_exists('included_quantity', $rule->condition ?? []));
+
+                return [
+                    'slug' => $plan->slug,
+                    'name' => $plan->name,
+                    'description' => $plan->description,
+                    'billing_model' => $plan->billing_model,
+                    'currency' => $plan->currency,
+                    'base_price_minor' => $plan->base_price_minor,
+                    'guest_price_minor' => (int) ($guestRule?->amount_minor ?? 0),
+                    'module_price_minor' => (int) ($moduleRule?->amount_minor ?? 0),
+                    'limits' => $plan->limits ?? [],
+                ];
+            }),
     ]);
 })->name('landing');
 
@@ -52,6 +63,9 @@ Route::get('/guest-portal', function () {
 Route::get('/table-menu', function () {
     return Inertia::render('TableMenu');
 })->name('table-menu');
+Route::get('/gallery/{token}', [PublicGalleryController::class, 'show'])->name('public-gallery.show');
+Route::get('/gallery/{token}/media/{photo}', [PublicGalleryController::class, 'content'])->name('public-gallery.content');
+Route::get('/gallery/{token}/media/{photo}/download', [PublicGalleryController::class, 'download'])->name('public-gallery.download');
 
 Route::middleware('auth')->group(function () {
     Route::get('/onboarding', [OnboardingController::class, 'show'])->name('onboarding');
@@ -59,6 +73,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/onboarding', [OnboardingController::class, 'store'])->name('onboarding.store');
     Route::get('/workspace', [OnboardingController::class, 'workspace'])->name('workspace');
     Route::post('/workspace/select', [OnboardingController::class, 'select'])->name('workspace.select');
+    Route::get('/payments/success', fn () => Inertia::render('PaymentSuccess', [
+        'reference' => request()->string('reference')->limit(255)->toString(),
+    ]))->name('payments.success');
+    Route::get('/payments/failed', fn () => Inertia::render('PaymentFailed', [
+        'reference' => request()->string('reference')->limit(255)->toString(),
+    ]))->name('payments.failed');
     Route::get('/team/invitations/{token}', [TeamInvitationController::class, 'show'])->name('team-invitations.show');
     Route::post('/team/invitations/{token}', [TeamInvitationController::class, 'accept'])->name('team-invitations.accept');
 });
@@ -66,7 +86,11 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'role:superadmin'])->group(function () {
     Route::get('/superadmin', [PlatformAdminController::class, 'index'])->name('superadmin.dashboard');
     Route::get('/superadmin/users', [PlatformAdminController::class, 'users'])->name('superadmin.users');
+    Route::get('/superadmin/event-types', [PlatformAdminController::class, 'eventTypes'])->name('superadmin.event-types');
+    Route::get('/superadmin/transactions', [PlatformTransactionController::class, 'index'])->name('superadmin.transactions');
+    Route::get('/superadmin/transactions/{payment}/receipt', [PlatformTransactionController::class, 'receipt'])->name('superadmin.transactions.receipt');
     Route::patch('/superadmin/users/{user}', [PlatformAdminController::class, 'updateUser'])->name('superadmin.users.update');
+    Route::patch('/superadmin/event-types/{eventType}', [PlatformAdminController::class, 'updateEventType'])->name('superadmin.event-types.update');
     Route::get('/settings/pricing', [PlatformPricingController::class, 'show'])->name('pricing-settings');
     Route::put('/settings/pricing', [PlatformPricingController::class, 'update'])->name('pricing-settings.update');
 });
@@ -89,6 +113,8 @@ Route::middleware(['auth', 'role:manager'])->group(function () {
     Route::get('/documents', fn () => Inertia::render('Documents'))->middleware('feature:documents,documents.view')->name('documents');
     Route::get('/ticketing', fn () => Inertia::render('Ticketing'))->middleware('feature:ticketing,ticketing.view')->name('ticketing');
     Route::get('/badges', fn () => Inertia::render('Badges'))->middleware('feature:badges,badges.view')->name('badges');
+    Route::get('/checkout', fn () => Inertia::render('Billing'))->middleware('feature:*,billing.view')->name('checkout');
+    Route::get('/transactions', fn () => Inertia::render('Transactions'))->middleware('feature:*,payments.view')->name('transactions');
 });
 
 Route::middleware(['auth', 'role:server'])->group(function () {

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Application\Migration\FoundationCatalogService;
 use App\Models\Event;
+use App\Models\EventType;
 use App\Models\Organization;
 use App\Models\Payment;
 use App\Models\Plan;
@@ -141,6 +143,45 @@ class PlatformAdminController extends Controller
                 'status' => $filters['status'] ?? '',
             ],
         ]);
+    }
+
+    public function eventTypes(FoundationCatalogService $catalog): Response
+    {
+        $catalog->seed();
+
+        return Inertia::render('SuperAdminEventTypes', [
+            'eventTypes' => EventType::query()
+                ->with('category:id,name')
+                ->withCount(['events', 'modules'])
+                ->orderBy('sort_order')
+                ->get()
+                ->map(fn (EventType $eventType) => [
+                    'id' => $eventType->id,
+                    'name' => $eventType->name,
+                    'slug' => $eventType->slug,
+                    'description' => $eventType->description,
+                    'icon' => $eventType->icon,
+                    'primary_color' => $eventType->primary_color,
+                    'category' => $eventType->category?->name,
+                    'status' => $eventType->status,
+                    'events_count' => $eventType->events_count,
+                    'modules_count' => $eventType->modules_count,
+                ]),
+        ]);
+    }
+
+    public function updateEventType(Request $request, EventType $eventType): RedirectResponse
+    {
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+        $eventType->update([
+            'status' => $data['is_active'] ? 'active' : 'inactive',
+        ]);
+
+        $state = $data['is_active'] ? 'activé' : 'désactivé';
+
+        return back()->with('success', "Le type d’événement « {$eventType->name} » a été {$state}.");
     }
 
     public function updateUser(Request $request, User $user): RedirectResponse

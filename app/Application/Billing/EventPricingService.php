@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class EventPricingService
 {
-    public const ENGINE_VERSION = 'planivo-pricing-v1';
+    public const ENGINE_VERSION = 'planivo-pricing-v2';
 
     /**
      * @return array<string, int>
@@ -144,33 +144,27 @@ class EventPricingService
             ->orderBy('priority')
             ->get();
 
-        foreach ($rules as $rule) {
-            $condition = $rule->condition ?? [];
-            $metric = $condition['metric'] ?? null;
-            $limitKey = $condition['limit_key'] ?? null;
-            if (! $metric || ! array_key_exists($metric, $metrics)) {
-                continue;
-            }
-            $limit = array_key_exists('included_quantity', $condition)
-                ? (int) $condition['included_quantity']
-                : (int) ($plan->limits[$limitKey] ?? 0);
-            $quantity = max(0, $metrics[$metric] - $limit);
-            if ($quantity === 0) {
+        foreach (['estimated_guests', 'enabled_modules'] as $metric) {
+            $rule = $rules
+                ->filter(fn (PricingRule $candidate) => ($candidate->condition['metric'] ?? null) === $metric)
+                ->sortByDesc(fn (PricingRule $candidate) => ($candidate->plan_id ? 4 : 0)
+                    + ($candidate->event_type_id ? 2 : 0)
+                    + ($metric === 'enabled_modules'
+                        && array_key_exists('included_quantity', $candidate->condition ?? []) ? 1 : 0))
+                ->first();
+            if (! $rule) {
                 continue;
             }
 
-            $amount = match ($rule->operation) {
-                'fixed' => (int) $rule->amount_minor,
-                'percentage' => (int) round(
-                    $subtotal * ((int) $rule->percentage_basis_points / 10000),
-                ),
-                default => $quantity * (int) $rule->amount_minor,
-            };
+            $quantity = max(0, (int) ($metrics[$metric] ?? 0));
+            $amount = $quantity * (int) $rule->amount_minor;
             $lines[] = [
-                'key' => $rule->id,
-                'label' => $rule->name,
-                'quantity' => $rule->operation === 'per_unit' ? $quantity : 1,
-                'unit' => $rule->unit_name,
+                'key' => $metric,
+                'label' => $metric === 'estimated_guests'
+                    ? 'Invités'
+                    : 'Modules sélectionnés',
+                'quantity' => $quantity,
+                'unit' => $metric === 'estimated_guests' ? 'invité' : 'module',
                 'unit_amount_minor' => (int) $rule->amount_minor,
                 'amount_minor' => $amount,
             ];

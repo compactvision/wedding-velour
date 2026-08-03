@@ -147,7 +147,9 @@ if (!isBrowser || !appElement) {
             const component = page.default;
             const superAdminPages = [
                 'SuperAdminDashboard',
+                'SuperAdminEventTypes',
                 'SuperAdminUsers',
+                'SuperAdminTransactions',
                 'PricingSettings',
             ];
 
@@ -158,7 +160,10 @@ if (!isBrowser || !appElement) {
                 'ServerInterface',
                 'DoorAgent',
                 'TableMenu',
+                'PublicGallery',
                 'Onboarding',
+                'PaymentFailed',
+                'PaymentSuccess',
                 'TeamInvitation',
                 'auth/Login',
             ];

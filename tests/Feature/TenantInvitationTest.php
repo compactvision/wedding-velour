@@ -73,6 +73,9 @@ class TenantInvitationTest extends TestCase
             'footer' => 'À bientôt',
             'background_image' => '/storage/uploads/soleil.jpg',
             'accent_color' => '#C47A32',
+            'couple_names' => 'Lina & Marc',
+            'couple_initials' => 'L&M',
+            'dress_code' => 'Tenue de soirée, tons champagne et sauge',
             'rsvp_deadline' => '2027-06-01',
             'show_event_details' => true,
         ];
@@ -81,7 +84,12 @@ class TenantInvitationTest extends TestCase
             ->putJson($url, $configuration)
             ->assertOk()
             ->assertJsonPath('data.configuration.title', 'La fête du Soleil')
-            ->assertJsonPath('data.configuration.accent_color', '#C47A32');
+            ->assertJsonPath('data.configuration.accent_color', '#C47A32')
+            ->assertJsonPath('data.configuration.couple_initials', 'L&M')
+            ->assertJsonPath(
+                'data.configuration.dress_code',
+                'Tenue de soirée, tons champagne et sauge',
+            );
 
         $this->assertSame(
             'La fête du Soleil',
@@ -95,7 +103,8 @@ class TenantInvitationTest extends TestCase
         $this->getJson("/api/public/invitations/{$confirmed->invitation_link}")
             ->assertOk()
             ->assertJsonPath('wedding.invitation_custom.title', 'La fête du Soleil')
-            ->assertJsonPath('wedding.invitation_custom.rsvp_question', 'Pouvez-vous être des nôtres ?');
+            ->assertJsonPath('wedding.invitation_custom.rsvp_question', 'Pouvez-vous être des nôtres ?')
+            ->assertJsonPath('wedding.event_type_slug', 'birthday');
     }
 
     public function test_wedding_receives_only_wedding_invitation_content_suggestions(): void
@@ -138,6 +147,47 @@ class TenantInvitationTest extends TestCase
         ])->assertUnprocessable();
 
         $this->assertSame('invited', $guest->fresh()->status);
+    }
+
+    public function test_personal_invitation_requires_the_guests_identity_when_link_is_forwarded(): void
+    {
+        [, $organization, $event] = $this->createTenant('invitation-privee', 'wedding');
+        $guest = $this->createGuest($organization, $event, [
+            'first_name' => 'Aline',
+            'email' => 'aline@example.com',
+            'phone' => '+243 812 345 678',
+        ]);
+        $url = "/api/public/invitations/{$guest->invitation_link}";
+
+        $this->getJson($url)
+            ->assertOk()
+            ->assertJsonPath('requires_verification', true)
+            ->assertJsonPath('verification_channel', 'email_or_phone')
+            ->assertJsonMissingPath('guest')
+            ->assertJsonMissingPath('table');
+
+        $this->postJson("{$url}/verify", ['identity' => 'autre@example.com'])
+            ->assertUnprocessable();
+
+        $accessToken = $this->postJson("{$url}/verify", [
+            'identity' => 'ALINE@example.com',
+        ])->assertOk()->json('access_token');
+
+        $this->putJson($url, [
+            'status' => 'confirmed',
+            'menu_preferences' => [],
+        ])->assertForbidden();
+
+        $this->withHeader('X-Invitation-Access', $accessToken)
+            ->getJson($url)
+            ->assertOk()
+            ->assertJsonPath('guest.first_name', 'Aline');
+
+        $this->withHeader('X-Invitation-Access', $accessToken)
+            ->putJson($url, [
+                'status' => 'confirmed',
+                'menu_preferences' => [],
+            ])->assertOk();
     }
 
     public function test_member_can_view_but_cannot_update_invitation(): void

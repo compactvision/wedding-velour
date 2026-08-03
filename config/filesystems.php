@@ -2,6 +2,9 @@
 
 return [
 
+    'media_disk' => env('MEDIA_DISK', env('FILESYSTEM_DISK', 'local')),
+    'media_max_file_kb' => (int) env('MEDIA_MAX_FILE_KB', 524288),
+
     /*
     |--------------------------------------------------------------------------
     | Default Filesystem Disk

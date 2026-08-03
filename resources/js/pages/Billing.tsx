@@ -93,6 +93,10 @@ export default function Billing() {
                 window.crypto.randomUUID(),
             ),
         onSuccess: (payment) => {
+            if (payment.checkout_url) {
+                window.location.assign(payment.checkout_url);
+                return;
+            }
             setPaymentMessage(
                 `Paiement ${payment.external_reference} créé. En attente de la confirmation sécurisée du prestataire.`,
             );
@@ -137,8 +141,8 @@ export default function Billing() {
     return (
         <div>
             <PageHeader
-                title="Plans & tarification"
-                subtitle={`${workspace.event.name} · estimation calculée par Planivo`}
+                title="Finaliser mon offre"
+                subtitle={`${workspace.event.name} · montant calculé depuis les tarifs configurés par Planivo`}
             >
                 {platformAdmin && (
                     <Button variant="outline" asChild>
@@ -238,7 +242,7 @@ export default function Billing() {
                                 </div>
                                 {plan.billing_model !== 'enterprise' && (
                                     <p className="text-xs text-muted-foreground">
-                                        forfait par événement
+                                        pack + invités + modules sélectionnés
                                     </p>
                                 )}
                             </CardHeader>
@@ -250,7 +254,7 @@ export default function Billing() {
                                                 'fr-FR',
                                             )}
                                         </strong>{' '}
-                                        invités inclus
+                                        invités maximum
                                     </p>
                                     <p>
                                         <strong>{plan.limits.max_users}</strong>{' '}
@@ -260,7 +264,7 @@ export default function Billing() {
                                         <strong>
                                             {plan.limits.max_modules}
                                         </strong>{' '}
-                                        modules inclus
+                                        modules disponibles
                                     </p>
                                     <p>
                                         <strong>
@@ -268,6 +272,20 @@ export default function Billing() {
                                         </strong>{' '}
                                         Go de stockage
                                     </p>
+                                    {plan.estimated_lines
+                                        .filter((line) => line.key !== 'base')
+                                        .map((line) => (
+                                            <p
+                                                key={line.key}
+                                                className="text-muted-foreground"
+                                            >
+                                                {money(
+                                                    line.unit_amount_minor,
+                                                    plan.currency,
+                                                )}{' '}
+                                                par {line.unit}
+                                            </p>
+                                        ))}
                                 </div>
                                 {canManage &&
                                     plan.billing_model !== 'enterprise' && (

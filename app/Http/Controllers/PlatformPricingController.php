@@ -36,7 +36,7 @@ class PlatformPricingController extends Controller
                         'base_price_minor' => $plan->base_price_minor,
                         'max_guests' => (int) ($plan->limits['max_guests'] ?? 0),
                         'guest_price_minor' => (int) ($guestRule?->amount_minor ?? 0),
-                        'included_modules' => (int) ($moduleRule?->condition['included_quantity'] ?? 0),
+                        'max_modules' => (int) ($plan->limits['max_modules'] ?? 0),
                         'module_price_minor' => (int) ($moduleRule?->amount_minor ?? 0),
                     ];
                 }),
@@ -52,7 +52,7 @@ class PlatformPricingController extends Controller
             'plans.*.base_price_minor' => ['required', 'integer', 'min:0', 'max:100000000'],
             'plans.*.max_guests' => ['required', 'integer', 'min:1', 'max:1000000'],
             'plans.*.guest_price_minor' => ['required', 'integer', 'min:0', 'max:1000000'],
-            'plans.*.included_modules' => ['required', 'integer', 'min:0', 'max:1000'],
+            'plans.*.max_modules' => ['required', 'integer', 'min:1', 'max:1000'],
             'plans.*.module_price_minor' => ['required', 'integer', 'min:0', 'max:1000000'],
         ]);
 
@@ -65,6 +65,7 @@ class PlatformPricingController extends Controller
                     ->firstOrFail();
                 $limits = $plan->limits ?? [];
                 $limits['max_guests'] = $input['max_guests'];
+                $limits['max_modules'] = $input['max_modules'];
                 $plan->update([
                     'base_price_minor' => $input['base_price_minor'],
                     'limits' => $limits,
@@ -88,7 +89,7 @@ class PlatformPricingController extends Controller
                 $moduleRule->fill([
                     'condition' => [
                         'metric' => 'enabled_modules',
-                        'included_quantity' => $input['included_modules'],
+                        'included_quantity' => 0,
                     ],
                     'amount_minor' => $input['module_price_minor'],
                 ])->save();

@@ -214,7 +214,7 @@ class FoundationCatalogService
                 'name' => $definition['name'],
                 'description' => $definition['description'],
                 'icon' => $definition['icon'],
-                'status' => 'active',
+                'status' => $eventType->exists ? $eventType->status : 'active',
                 'primary_color' => $definition['color'],
                 'sort_order' => array_search($slug, array_keys(self::EVENT_TYPES), true),
             ])->save();

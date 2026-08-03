@@ -16,6 +16,8 @@ use Illuminate\Validation\ValidationException;
 
 class PaymentService
 {
+    public function __construct(private readonly RdcardGateway $rdcard) {}
+
     public function create(
         Event $event,
         PricingQuote $quote,
@@ -49,7 +51,17 @@ class PaymentService
             return $existing->load(['quote.plan', 'subscription']);
         }
 
-        return DB::transaction(function () use (
+        if ($provider === 'rdcard') {
+            $apiKey = config('payments.rdcard.api_key');
+            $secret = config('payments.rdcard.secret');
+            if (! is_string($apiKey) || $apiKey === '' || ! is_string($secret) || $secret === '') {
+                throw ValidationException::withMessages([
+                    'payment' => 'Le paiement RDCARD n’est pas encore configuré.',
+                ]);
+            }
+        }
+
+        $payment = DB::transaction(function () use (
             $event,
             $quote,
             $user,
@@ -78,6 +90,51 @@ class PaymentService
 
             return $payment->load(['quote.plan', 'subscription']);
         });
+
+        if ($provider !== 'rdcard') {
+            return $payment;
+        }
+
+        try {
+            $session = $this->rdcard->createSession($payment, $user);
+            $payment->update([
+                'metadata' => [
+                    ...($payment->metadata ?? []),
+                    'rdcard_session_id' => $session['id'],
+                    'checkout_url' => $session['checkoutUrl'],
+                ],
+            ]);
+            PaymentAttempt::query()
+                ->where('payment_id', $payment->id)
+                ->latest('attempt_number')
+                ->first()
+                ?->update([
+                    'status' => 'redirect_ready',
+                    'provider_request_id' => $session['id'],
+                    'normalized_response' => [
+                        'id' => $session['id'],
+                        'amount' => $session['amount'],
+                        'currency' => $session['currency'],
+                    ],
+                ]);
+
+            $freshPayment = $payment->fresh(['quote.plan', 'subscription']);
+            $freshPayment->wasRecentlyCreated = true;
+
+            return $freshPayment;
+        } catch (\Throwable $exception) {
+            $payment->update(['status' => 'failed']);
+            PaymentAttempt::query()
+                ->where('payment_id', $payment->id)
+                ->latest('attempt_number')
+                ->first()
+                ?->update([
+                    'status' => 'failed',
+                    'error_message' => $exception->getMessage(),
+                ]);
+
+            throw $exception;
+        }
     }
 
     /**
@@ -129,13 +186,17 @@ class PaymentService
                 }
 
                 if ($payload['status'] !== 'paid') {
-                    $payment->update(['status' => $payload['status']]);
+                    if ($payment->status !== 'paid') {
+                        $payment->update(['status' => $payload['status']]);
+                    }
                     PaymentAttempt::query()
                         ->where('payment_id', $payment->id)
                         ->latest('attempt_number')
                         ->first()
                         ?->update([
-                            'status' => $payload['status'],
+                            'status' => $payment->status === 'paid'
+                                ? 'succeeded'
+                                : $payload['status'],
                             'normalized_response' => $payload,
                         ]);
                     $webhook->update([
@@ -182,6 +243,7 @@ class PaymentService
                         'paid_at' => now(),
                     ]);
                     $payment->quote->update(['status' => 'accepted']);
+                    $payment->event()->update(['status' => 'active']);
                     Invoice::query()->create([
                         'organization_id' => $payment->organization_id,
                         'event_id' => $payment->event_id,

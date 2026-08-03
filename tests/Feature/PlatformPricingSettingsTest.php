@@ -36,7 +36,7 @@ class PlatformPricingSettingsTest extends TestCase
             'base_price_minor' => $plan->slug === 'essential' ? 3500 : $plan->base_price_minor,
             'max_guests' => $plan->slug === 'essential' ? 120 : $plan->limits['max_guests'],
             'guest_price_minor' => $plan->slug === 'essential' ? 60 : 40,
-            'included_modules' => $plan->slug === 'essential' ? 4 : 6,
+            'max_modules' => $plan->slug === 'essential' ? 8 : $plan->limits['max_modules'],
             'module_price_minor' => $plan->slug === 'essential' ? 175 : 100,
         ])->all();
 
@@ -47,12 +47,19 @@ class PlatformPricingSettingsTest extends TestCase
         $essential = Plan::query()->where('slug', 'essential')->firstOrFail();
         $this->assertSame(3500, $essential->base_price_minor);
         $this->assertSame(120, $essential->limits['max_guests']);
+        $this->assertSame(8, $essential->limits['max_modules']);
         $moduleRule = PricingRule::query()
             ->where('plan_id', $essential->id)
             ->get()
             ->first(fn (PricingRule $rule) => array_key_exists('included_quantity', $rule->condition ?? []));
-        $this->assertSame(4, $moduleRule->condition['included_quantity']);
+        $this->assertSame(0, $moduleRule->condition['included_quantity']);
         $this->assertSame(175, $moduleRule->amount_minor);
+        $guestRule = PricingRule::query()
+            ->where('plan_id', $essential->id)
+            ->get()
+            ->first(fn (PricingRule $rule) => ($rule->condition['metric'] ?? null) === 'estimated_guests');
+        $this->assertSame(0, $guestRule->condition['included_quantity']);
+        $this->assertSame(60, $guestRule->amount_minor);
     }
 
     public function test_regular_organization_admin_cannot_change_platform_prices(): void

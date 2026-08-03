@@ -56,15 +56,26 @@ class TenantGuestTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status', 'confirmed');
 
-        $this->getJson("/api/public/invitations/{$guest->invitation_link}")
+        $publicUrl = "/api/public/invitations/{$guest->invitation_link}";
+        $this->getJson($publicUrl)
+            ->assertOk()
+            ->assertJsonPath('requires_verification', true)
+            ->assertJsonMissingPath('guest');
+        $accessToken = $this->postJson("{$publicUrl}/verify", [
+            'identity' => 'amina@example.test',
+        ])->assertOk()->json('access_token');
+
+        $this->withHeader('X-Invitation-Access', $accessToken)
+            ->getJson($publicUrl)
             ->assertOk()
             ->assertJsonPath('guest.id', $guestId)
             ->assertJsonPath('wedding.title', $event->name);
 
-        $this->putJson("/api/public/invitations/{$guest->invitation_link}", [
-            'status' => 'attending',
-            'menu_preferences' => [],
-        ])
+        $this->withHeader('X-Invitation-Access', $accessToken)
+            ->putJson($publicUrl, [
+                'status' => 'attending',
+                'menu_preferences' => [],
+            ])
             ->assertOk()
             ->assertJsonPath('status', 'confirmed');
 

@@ -24,7 +24,7 @@ class TenantBillingTest extends TestCase
     {
         [$owner, $organization, $event] = $this->createTenant(
             'devis',
-            estimatedGuests: 250,
+            estimatedGuests: 230,
         );
         $url = $this->billingUrl($organization, $event);
 
@@ -32,7 +32,7 @@ class TenantBillingTest extends TestCase
             ->getJson($url)
             ->assertOk()
             ->assertJsonCount(4, 'data.plans')
-            ->assertJsonPath('data.metrics.estimated_guests', 250);
+            ->assertJsonPath('data.metrics.estimated_guests', 230);
 
         $response = $this->actingAs($owner)->postJson("{$url}/quotes", [
             'plan_slug' => 'essential',
@@ -42,20 +42,27 @@ class TenantBillingTest extends TestCase
         $response
             ->assertCreated()
             ->assertJsonPath('data.currency', 'USD')
-            ->assertJsonPath('data.subtotal_minor', 10550)
-            ->assertJsonPath('data.total_minor', 10550)
-            ->assertJsonPath('data.inputs.estimated_guests', 250)
+            ->assertJsonPath('data.subtotal_minor', 26500)
+            ->assertJsonPath('data.total_minor', 26500)
+            ->assertJsonPath('data.inputs.estimated_guests', 230)
+            ->assertJsonPath('data.lines.0.amount_minor', 2900)
+            ->assertJsonPath('data.lines.1.quantity', 230)
+            ->assertJsonPath('data.lines.1.unit_amount_minor', 100)
+            ->assertJsonPath('data.lines.1.amount_minor', 23000)
+            ->assertJsonPath('data.lines.2.quantity', 4)
+            ->assertJsonPath('data.lines.2.unit_amount_minor', 150)
+            ->assertJsonPath('data.lines.2.amount_minor', 600)
             ->assertJsonCount(3, 'data.lines');
 
         $quote = PricingQuote::query()->firstOrFail();
-        $this->assertSame(10550, $quote->total_minor);
+        $this->assertSame(26500, $quote->total_minor);
         $this->assertSame(64, strlen($quote->integrity_hash));
-        $this->assertSame('planivo-pricing-v1', $quote->engine_version);
+        $this->assertSame('planivo-pricing-v2', $quote->engine_version);
 
         $this->actingAs($owner)
             ->putJson("{$url}/quotes/{$quote->id}", ['total_minor' => 1])
             ->assertNotFound();
-        $this->assertSame(10550, $quote->fresh()->total_minor);
+        $this->assertSame(26500, $quote->fresh()->total_minor);
     }
 
     public function test_enterprise_plan_requires_a_custom_offer(): void

@@ -24,6 +24,9 @@ class InvitationSettingsService
         'footer',
         'background_image',
         'accent_color',
+        'couple_names',
+        'couple_initials',
+        'dress_code',
         'rsvp_deadline',
         'show_event_details',
     ];
@@ -169,6 +172,9 @@ class InvitationSettingsService
             'footer' => 'Merci et à très vite',
             'background_image' => '',
             'accent_color' => $event->type?->primary_color ?: '#B98235',
+            'couple_names' => '',
+            'couple_initials' => '',
+            'dress_code' => '',
             'rsvp_deadline' => null,
             'show_event_details' => true,
         ];

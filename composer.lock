@@ -4,8 +4,49 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6cf4468d16108858a7f7ab7547c8ad1e",
+    "content-hash": "1c412212f5c1bd8d982b5c3259b81413",
     "packages": [
+        {
+            "name": "acoriss/payment-gateway",
+            "version": "v0.1.4",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Acoriss-RDC/payment-gateway-php-sdk.git",
+                "reference": "cc75f251c0fe45553a6d7158c81583141f0f8668"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Acoriss-RDC/payment-gateway-php-sdk/zipball/cc75f251c0fe45553a6d7158c81583141f0f8668",
+                "reference": "cc75f251c0fe45553a6d7158c81583141f0f8668",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.8",
+                "php": ">=8.1",
+                "psr/log": "^3.0"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^3.64",
+                "phpstan/phpstan": "^1.10",
+                "phpunit/phpunit": "^10.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Acoriss\\PaymentGateway\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "PHP SDK for Acoriss Payment Gateway",
+            "support": {
+                "issues": "https://github.com/Acoriss-RDC/payment-gateway-php-sdk/issues",
+                "source": "https://github.com/Acoriss-RDC/payment-gateway-php-sdk/tree/v0.1.4"
+            },
+            "time": "2025-12-16T10:35:23+00:00"
+        },
         {
             "name": "brick/math",
             "version": "0.14.8",

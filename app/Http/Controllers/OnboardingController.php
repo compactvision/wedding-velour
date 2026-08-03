@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Application\Billing\EventPricingService;
+use App\Application\Billing\PaymentService;
 use App\Application\Migration\FoundationCatalogService;
 use App\Application\Onboarding\OnboardingPricingService;
 use App\Application\Onboarding\ProvisionEventService;
 use App\Models\Event;
 use App\Models\EventType;
 use App\Models\Organization;
+use App\Models\Plan;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -119,7 +123,9 @@ class OnboardingController extends Controller
         ProvisionEventService $provisioner,
         FoundationCatalogService $catalog,
         OnboardingPricingService $pricing,
-    ): RedirectResponse {
+        EventPricingService $eventPricing,
+        PaymentService $payments,
+    ): JsonResponse {
         $catalog->seed();
 
         $data = $request->validate([
@@ -157,6 +163,7 @@ class OnboardingController extends Controller
                 Rule::exists('modules', 'slug')->where('status', 'active'),
             ],
             'pricing_signature' => ['required', 'string', 'size:64'],
+            'idempotency_key' => ['required', 'string', 'min:16', 'max:100'],
         ]);
         $eventType = EventType::query()->with('modules')->findOrFail($data['event_type_id']);
         $preview = $pricing->verify(
@@ -175,23 +182,52 @@ class OnboardingController extends Controller
                 ->firstOrFail();
         }
 
-        $result = $provisioner->provision($request->user(), $data, $organization);
-        $settings = $result['event']->settings()->firstOrFail();
-        $featureFlags = $settings->feature_flags ?? [];
-        $featureFlags['onboarding_pricing'] = [
-            'plan' => $preview['plan'],
-            'currency' => $preview['currency'],
-            'total_minor' => $preview['total_minor'],
-            'lines' => $preview['lines'],
-            'quoted_at' => now()->toIso8601String(),
-        ];
-        $settings->update(['feature_flags' => $featureFlags]);
+        [$result, $payment, $checkoutUrl] = DB::transaction(function () use (
+            $request,
+            $data,
+            $organization,
+            $preview,
+            $provisioner,
+            $eventPricing,
+            $payments,
+        ) {
+            $result = $provisioner->provision($request->user(), $data, $organization);
+            $result['event']->update(['status' => 'pending_payment']);
+            $settings = $result['event']->settings()->firstOrFail();
+            $featureFlags = $settings->feature_flags ?? [];
+            $featureFlags['onboarding_pricing'] = [
+                'plan' => $preview['plan'],
+                'currency' => $preview['currency'],
+                'total_minor' => $preview['total_minor'],
+                'lines' => $preview['lines'],
+                'quoted_at' => now()->toIso8601String(),
+            ];
+            $settings->update(['feature_flags' => $featureFlags]);
+            $plan = Plan::query()->findOrFail($preview['plan']['id']);
+            $quote = $eventPricing->quote($result['event'], $plan, $request->user());
+            abort_unless($quote->total_minor === $preview['total_minor'], 409, 'Le montant de l’offre a changé.');
+            $payment = $payments->create(
+                $result['event'],
+                $quote,
+                $request->user(),
+                $data['idempotency_key'],
+                (string) config('payments.default_provider'),
+            );
+            $checkoutUrl = $payment->metadata['checkout_url'] ?? null;
+            abort_unless(is_string($checkoutUrl) && $checkoutUrl !== '', 502, 'RDCARD n’a pas retourné de page de paiement.');
+
+            return [$result, $payment, $checkoutUrl];
+        });
         $this->activate($request, $result['organization'], $result['event']);
 
-        return redirect()->route('workspace')->with(
-            'success',
-            "L’événement « {$result['event']->name} » est prêt.",
-        );
+        return response()->json([
+            'data' => [
+                'event_id' => $result['event']->id,
+                'payment_id' => $payment->id,
+                'reference' => $payment->external_reference,
+                'checkout_url' => $checkoutUrl,
+            ],
+        ], 201);
     }
 
     public function select(Request $request): RedirectResponse
@@ -210,6 +246,10 @@ class OnboardingController extends Controller
             ->firstOrFail();
 
         $this->activate($request, $event->organization, $event);
+
+        if ($event->status === 'pending_payment') {
+            return redirect()->route('transactions');
+        }
 
         return redirect()->route('workspace')->with(
             'success',
@@ -238,6 +278,10 @@ class OnboardingController extends Controller
             $request->session()->forget(['active_organization_id', 'active_event_id']);
 
             return redirect()->route('onboarding');
+        }
+
+        if ($event->status === 'pending_payment') {
+            return redirect()->route('transactions');
         }
 
         return Inertia::render('Workspace', [

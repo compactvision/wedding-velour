@@ -26,6 +26,8 @@ class LandingPageTest extends TestCase
                 ->has('plans', 4)
                 ->where('plans.0.slug', 'essential')
                 ->where('plans.0.base_price_minor', 4200)
+                ->where('plans.0.guest_price_minor', 100)
+                ->where('plans.0.module_price_minor', 150)
                 ->where('plans.0.currency', 'USD'));
     }
 

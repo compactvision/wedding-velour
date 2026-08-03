@@ -26,6 +26,8 @@ import {
     Flower2,
     Leaf,
     Bell,
+    LockKeyhole,
+    ShieldCheck,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { format } from 'date-fns';
@@ -34,6 +36,7 @@ import BrandLogo from '@/components/shared/BrandLogo';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { usePage } from '@inertiajs/react';
+import RoyalWeddingInvitation from '@/components/invitation/RoyalWeddingInvitation';
 
 const CATEGORY_LABELS: Record<string, { label: string; emoji: string }> = {
     starter: { label: 'Entrées', emoji: '🥗' },
@@ -108,6 +111,9 @@ export default function Invitation() {
     const { url } = usePage();
     const searchParams = new URLSearchParams(url.split('?')[1] || '');
     const inviteToken = searchParams.get('invite');
+    const accessStorageKey = inviteToken
+        ? `planivo:invitation-access:${inviteToken}`
+        : '';
 
     const [guest, setGuest] = useState(null);
     const [wedding, setWedding] = useState(null);
@@ -116,6 +122,18 @@ export default function Invitation() {
     const [table, setTable] = useState(null);
     const [coGuests, setCoGuests] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [accessToken, setAccessToken] = useState<string | null>(() =>
+        typeof window !== 'undefined' && accessStorageKey
+            ? window.localStorage.getItem(accessStorageKey)
+            : null,
+    );
+    const [verification, setVerification] = useState<null | {
+        verification_channel: 'email' | 'phone' | 'email_or_phone';
+        masked_destination: string;
+    }>(null);
+    const [verificationIdentity, setVerificationIdentity] = useState('');
+    const [verificationError, setVerificationError] = useState('');
+    const [isVerifying, setIsVerifying] = useState(false);
 
     // Interaction states
     const [envelopeOpened, setEnvelopeOpened] = useState(false);
@@ -137,7 +155,17 @@ export default function Invitation() {
             }
 
             try {
-                const invitation = await base44.public.invitation(inviteToken);
+                const invitation = await base44.public.invitation(
+                    inviteToken,
+                    accessToken,
+                );
+                if (invitation.requires_verification) {
+                    setVerification(invitation);
+                    setGuest(null);
+                    setWedding(null);
+                    setLoading(false);
+                    return;
+                }
                 const currentGuest = invitation.guest;
                 setGuest(currentGuest);
                 setMenuPreferences(currentGuest.menu_preferences || []);
@@ -153,11 +181,42 @@ export default function Invitation() {
             setLoading(false);
         }
         load();
-    }, [inviteToken]);
+    }, [inviteToken, accessToken]);
+
+    const handleVerifyInvitation = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!inviteToken || !verificationIdentity.trim()) return;
+
+        setIsVerifying(true);
+        setVerificationError('');
+        try {
+            const result = await base44.public.verifyInvitation(
+                inviteToken,
+                verificationIdentity.trim(),
+            );
+            window.localStorage.setItem(accessStorageKey, result.access_token);
+            setAccessToken(result.access_token);
+            setVerification(null);
+            setLoading(true);
+        } catch {
+            setVerificationError(
+                'L’e-mail ou le numéro saisi ne correspond pas à cette invitation.',
+            );
+        } finally {
+            setIsVerifying(false);
+        }
+    };
 
     const handleOpenEnvelope = () => {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+
         setEnvelopeOpened(true);
-        setTimeout(() => setShowLetter(true), 1200);
+        setTimeout(() => {
+            setShowLetter(true);
+            window.requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+        }, 1900);
     };
 
     const handleRSVP = async (status: string) => {
@@ -169,6 +228,7 @@ export default function Invitation() {
                     status,
                     menu_preferences: menuPreferences,
                 },
+                accessToken,
             );
             setGuest({
                 ...guest,
@@ -176,8 +236,12 @@ export default function Invitation() {
                 status,
                 menu_preferences: menuPreferences,
             });
+            setIsMenuModalOpen(false);
             setSavedSuccess(true);
-            if (status === 'attending' || status === 'confirmed') {
+            if (
+                (status === 'attending' || status === 'confirmed') &&
+                wedding.event_type_slug !== 'wedding'
+            ) {
                 setTimeout(() => {
                     downloadInvitationCard();
                 }, 650);
@@ -204,6 +268,7 @@ export default function Invitation() {
                             : guest.status || 'confirmed',
                     menu_preferences: menuPreferences,
                 },
+                accessToken,
             );
             setGuest({
                 ...guest,
@@ -225,6 +290,115 @@ export default function Invitation() {
             <div className="flex min-h-screen items-center justify-center bg-stone-50">
                 <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
             </div>
+        );
+    }
+
+    if (verification) {
+        const asksForEmail = verification.verification_channel === 'email';
+        const asksForPhone = verification.verification_channel === 'phone';
+
+        return (
+            <main className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-[#f3eadf] px-5 py-10">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#fffaf2_0%,transparent_52%),linear-gradient(145deg,rgba(113,75,61,.08),transparent_55%)]" />
+                <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full border border-[#8b5e4a]/10" />
+                <div className="absolute -right-20 -bottom-20 h-64 w-64 rounded-full border border-[#8b5e4a]/10" />
+
+                <Card className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-white/70 bg-[#fffdf9]/95 p-0 shadow-[0_28px_90px_rgba(75,45,35,.18)]">
+                    <div className="h-1.5 bg-gradient-to-r from-[#704438] via-[#b78a6b] to-[#704438]" />
+                    <div className="px-7 py-9 text-center sm:px-10">
+                        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#704438] text-[#fff9ef] shadow-[0_12px_32px_rgba(112,68,56,.28)]">
+                            <LockKeyhole
+                                className="h-8 w-8"
+                                strokeWidth={1.5}
+                            />
+                        </div>
+                        <p className="mt-6 text-xs font-semibold tracking-[0.28em] text-[#9a725e] uppercase">
+                            Invitation privée
+                        </p>
+                        <h1 className="mt-3 font-display text-3xl text-[#3c2923]">
+                            Cette invitation vous est personnellement destinée
+                        </h1>
+                        <p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-[#78655d]">
+                            Pour protéger les informations du mariage, confirmez
+                            {asksForEmail
+                                ? ' votre adresse e-mail'
+                                : asksForPhone
+                                  ? ' votre numéro de téléphone'
+                                  : ' votre e-mail ou votre numéro de téléphone'}
+                            .
+                        </p>
+
+                        <form
+                            onSubmit={handleVerifyInvitation}
+                            className="mt-7 text-left"
+                        >
+                            <Label
+                                htmlFor="invitation-identity"
+                                className="text-[#4b3530]"
+                            >
+                                {asksForEmail
+                                    ? 'Adresse e-mail'
+                                    : asksForPhone
+                                      ? 'Numéro de téléphone'
+                                      : 'E-mail ou téléphone'}
+                            </Label>
+                            <input
+                                id="invitation-identity"
+                                type={
+                                    asksForEmail
+                                        ? 'email'
+                                        : asksForPhone
+                                          ? 'tel'
+                                          : 'text'
+                                }
+                                autoComplete={
+                                    asksForEmail
+                                        ? 'email'
+                                        : asksForPhone
+                                          ? 'tel'
+                                          : 'off'
+                                }
+                                value={verificationIdentity}
+                                onChange={(event) =>
+                                    setVerificationIdentity(event.target.value)
+                                }
+                                placeholder={verification.masked_destination}
+                                className="mt-2 h-13 w-full rounded-2xl border border-[#d9c7ba] bg-white px-4 text-base text-[#3c2923] transition outline-none focus:border-[#8b5e4a] focus:ring-4 focus:ring-[#8b5e4a]/10"
+                                required
+                            />
+                            {verificationError && (
+                                <p
+                                    className="mt-3 text-sm text-red-700"
+                                    role="alert"
+                                >
+                                    {verificationError}
+                                </p>
+                            )}
+                            <Button
+                                type="submit"
+                                disabled={
+                                    isVerifying || !verificationIdentity.trim()
+                                }
+                                className="mt-5 h-13 w-full rounded-2xl bg-[#704438] text-[#fffaf2] hover:bg-[#59352c]"
+                            >
+                                {isVerifying ? (
+                                    'Vérification…'
+                                ) : (
+                                    <>
+                                        <ShieldCheck className="mr-2 h-5 w-5" />
+                                        Déverrouiller mon invitation
+                                    </>
+                                )}
+                            </Button>
+                        </form>
+                        <p className="mt-5 text-xs leading-5 text-[#9a8880]">
+                            Le lien transféré seul ne permet pas d’accéder à
+                            l’invitation, au placement de table ou au formulaire
+                            RSVP.
+                        </p>
+                    </div>
+                </Card>
+            </main>
         );
     }
 
@@ -717,6 +891,41 @@ export default function Invitation() {
         link.href = canvas.toDataURL('image/png');
         link.click();
     };
+
+    if (wedding.event_type_slug === 'wedding') {
+        return (
+            <RoyalWeddingInvitation
+                guest={guest}
+                wedding={wedding}
+                custom={custom}
+                timeline={timeline}
+                announcements={announcements}
+                menuItems={menuItems}
+                menuPreferences={menuPreferences}
+                table={table}
+                coGuests={coGuests}
+                inviteToken={inviteToken}
+                invitationUrl={invitationUrl}
+                formattedWeddingDate={formattedWeddingDate}
+                invitationTitle={invitationTitle}
+                accentColor={accentColor}
+                partyLabel={partyLabel}
+                hasCompanions={hasCompanions}
+                isAttending={isAttending}
+                isDeclined={isDeclined}
+                envelopeOpened={envelopeOpened}
+                showLetter={showLetter}
+                rsvpOpen={isMenuModalOpen}
+                isSubmitting={isSubmitting}
+                savedSuccess={savedSuccess}
+                onOpenEnvelope={handleOpenEnvelope}
+                onRsvpOpenChange={setIsMenuModalOpen}
+                onTogglePreference={toggleMenuPreference}
+                onRespond={handleRSVP}
+                onDownloadQr={downloadGuestQr}
+            />
+        );
+    }
 
     return (
         <div className="flex min-h-screen flex-col items-center overflow-x-hidden bg-[#fdf8ef] font-sans selection:bg-primary/20">

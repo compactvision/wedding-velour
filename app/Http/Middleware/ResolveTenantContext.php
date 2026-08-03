@@ -25,6 +25,20 @@ class ResolveTenantContext
         $event = $request->route('event');
         abort_unless($event === null || $event instanceof Event, 404);
 
+        if ($event?->status === 'pending_payment') {
+            $billingAccess = $request->is(
+                'api/organizations/*/events/*/billing',
+                'api/organizations/*/events/*/billing/*',
+                'api/organizations/*/events/*/transactions',
+                'api/organizations/*/events/*/transactions/*',
+            );
+            abort_unless(
+                $billingAccess,
+                402,
+                'Le paiement de cet événement doit être confirmé avant d’accéder à ses modules.',
+            );
+        }
+
         $context = $this->tenantAccess->resolve($user, $organization, $event);
         $request->attributes->set(TenantContext::class, $context);
         app()->instance(TenantContext::class, $context);

@@ -23,6 +23,7 @@ import {
     FolderLock,
     Tickets,
     IdCard,
+    ReceiptText,
 } from 'lucide-react';
 import React from 'react';
 import BrandLogo from '@/components/shared/BrandLogo';
@@ -189,6 +190,13 @@ export const navItems: NavItem[] = [
         roles: ['admin', 'manager'],
         modules: ['badges'],
         permission: 'badges.view',
+    },
+    {
+        path: '/transactions',
+        icon: ReceiptText,
+        label: 'Mes transactions',
+        roles: ['admin', 'manager'],
+        permission: 'payments.view',
     },
 ];
 

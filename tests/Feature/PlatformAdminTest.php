@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Application\Migration\FoundationCatalogService;
+use App\Models\EventType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -128,5 +129,70 @@ class PlatformAdminTest extends TestCase
             'email' => $superadmin->email,
             'password' => 'password',
         ])->assertRedirect('/superadmin');
+    }
+
+    public function test_superadmin_can_enable_and_disable_an_event_type(): void
+    {
+        $superadmin = User::factory()->create([
+            'role' => 'superadmin',
+            'is_active' => true,
+            'status' => 'active',
+        ]);
+        $organizer = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+            'status' => 'active',
+        ]);
+        $catalog = app(FoundationCatalogService::class);
+        $catalog->seed();
+        $wedding = EventType::query()->where('slug', 'wedding')->firstOrFail();
+
+        $this->actingAs($superadmin)
+            ->get('/superadmin/event-types')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('SuperAdminEventTypes')
+                ->has('eventTypes', 7)
+                ->where('eventTypes.0.slug', 'wedding'));
+
+        $this->actingAs($superadmin)
+            ->patch("/superadmin/event-types/{$wedding->id}", [
+                'is_active' => false,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+        $this->assertSame('inactive', $wedding->fresh()->status);
+
+        $catalog->seed();
+        $this->assertSame('inactive', $wedding->fresh()->status);
+
+        $this->actingAs($organizer)
+            ->get('/onboarding')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('eventTypes', 6)
+                ->where('eventTypes.0.slug', 'birthday'));
+
+        $this->actingAs($organizer)
+            ->postJson('/onboarding/quote', [
+                'event_type_id' => $wedding->id,
+                'estimated_guests' => 100,
+                'modules' => [],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('event_type_id');
+
+        $this->actingAs($superadmin)
+            ->patch("/superadmin/event-types/{$wedding->id}", [
+                'is_active' => true,
+            ])
+            ->assertRedirect();
+        $this->assertSame('active', $wedding->fresh()->status);
+
+        $this->actingAs($organizer)
+            ->patch("/superadmin/event-types/{$wedding->id}", [
+                'is_active' => false,
+            ])
+            ->assertForbidden();
     }
 }

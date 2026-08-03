@@ -47,6 +47,9 @@ class TenantInvitationController extends Controller
             'footer' => ['nullable', 'string', 'max:300'],
             'background_image' => ['nullable', 'string', 'max:2000'],
             'accent_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'couple_names' => ['nullable', 'string', 'max:160'],
+            'couple_initials' => ['nullable', 'string', 'max:5'],
+            'dress_code' => ['nullable', 'string', 'max:500'],
             'rsvp_deadline' => ['nullable', 'date'],
             'show_event_details' => ['required', 'boolean'],
         ]);

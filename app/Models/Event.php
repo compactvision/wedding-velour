@@ -181,6 +181,21 @@ class Event extends Model
         return $this->hasMany(Badge::class);
     }
 
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    public function galleryLink(): HasOne
+    {
+        return $this->hasOne(MediaGalleryLink::class);
+    }
+
     public function eventDocuments(): HasMany
     {
         return $this->documents();

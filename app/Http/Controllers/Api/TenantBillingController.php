@@ -173,6 +173,7 @@ class TenantBillingController extends Controller
             'status' => $payment->status,
             'provider' => $payment->provider,
             'external_reference' => $payment->external_reference,
+            'checkout_url' => $payment->metadata['checkout_url'] ?? null,
             'paid_at' => $payment->paid_at?->toIso8601String(),
             'created_at' => $payment->created_at?->toIso8601String(),
         ];
